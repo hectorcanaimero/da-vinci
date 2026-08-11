@@ -1,0 +1,52 @@
+# ── Secrets (NEVER commit these!) ──────────────────────────────────
+.env
+.da-vinci.env
+.env.local
+.env.*.local
+*.secret
+
+# ── Generated assets & test output ─────────────────────────────────
+assets/generated/
+!assets/generated/.gitkeep
+/tmp/
+/test-output/
+*.png
+*.jpg
+*.jpeg
+*.webp
+*.mp4
+*.mp3
+*.wav
+# Exceptions: keep gallery/example assets versioned
+!docs/examples/**/*.png
+!docs/examples/**/*.jpg
+!docs/examples/**/*.svg
+!docs/examples/**/*.gif
+!docs/**/*.png
+!docs/**/*.svg
+
+# ── Node ────────────────────────────────────────────────────────────
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+yarn.lock
+
+# ── OS ──────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ── Editors ────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.claude/settings.local.json
+
+# ── Logs ───────────────────────────────────────────────────────────
+*.log
+logs/

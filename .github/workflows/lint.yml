@@ -1,0 +1,34 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  syntax-check:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18, 20, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Check syntax on all .mjs files
+        run: |
+          set -e
+          for file in $(find src install.mjs -name '*.mjs'); do
+            echo "Checking $file..."
+            node --check "$file"
+          done
+          echo "✅ All files pass syntax check"
+
+      - name: Verify CLI --help works
+        run: node src/generate.mjs --help

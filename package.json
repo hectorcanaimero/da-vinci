@@ -1,0 +1,52 @@
+{
+  "name": "da-vinci",
+  "version": "1.0.0",
+  "description": "Universal visual generation skill for Claude Code — images, SVG, videos, audio via OpenAI, Gemini, FAL, KIE, HeyGen, and ElevenLabs with smart cost gating.",
+  "type": "module",
+  "main": "src/generate.mjs",
+  "bin": {
+    "davinci": "./src/generate.mjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "start": "node src/generate.mjs",
+    "install:setup": "node install.mjs",
+    "lint": "node --check src/generate.mjs && node --check src/utils/*.mjs && node --check src/providers/*.mjs",
+    "test:secrets": "node -e \"import('./src/utils/secrets.mjs').then(m => m.loadSecrets().then(s => console.log('OK. Source:', s.source, 'Keys:', Object.keys(s.secrets))))\""
+  },
+  "keywords": [
+    "claude-code",
+    "claude-skill",
+    "ai-image-generation",
+    "ai-video-generation",
+    "text-to-image",
+    "text-to-video",
+    "text-to-speech",
+    "svg-generation",
+    "flux",
+    "recraft",
+    "nano-banana",
+    "veo",
+    "kling",
+    "sora",
+    "elevenlabs",
+    "heygen",
+    "hyperframes",
+    "fal-ai",
+    "openai",
+    "gemini",
+    "infisical"
+  ],
+  "author": "Héctor Rodríguez",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hectorcanaimero/da-vinci.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hectorcanaimero/da-vinci/issues"
+  },
+  "homepage": "https://hectorcanaimero.github.io/da-vinci"
+}
