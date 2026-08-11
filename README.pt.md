@@ -9,9 +9,9 @@ Uma skill do Claude Code (e CLI standalone) que orquestra OpenAI, Google Gemini,
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/Node-%E2%89%A518-brightgreen)](package.json)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
-[![Website](https://img.shields.io/badge/website-live-6366f1)](https://hectorcanaimero.github.io/da-vinci)
+[![Website](https://img.shields.io/badge/website-live-6366f1)](https://davinci.guria.lat)
 
-[Website](https://hectorcanaimero.github.io/da-vinci) · [Setup](#setup) · [Matriz de Modelos](docs/references/model-matrix.md) · [Contribuir](CONTRIBUTING.md)
+[Website](https://davinci.guria.lat) · [Setup](#setup) · [Matriz de Modelos](docs/references/model-matrix.md) · [Contribuir](CONTRIBUTING.md)
 
 [English](README.md) · [Español](README.es.md)
 
