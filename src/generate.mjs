@@ -57,7 +57,7 @@ const intent = positionals[0];
 
 if (flags.help || !intent) {
   printHelp();
-  process.exit(intent ? 0 : 1);
+  process.exit(flags.help ? 0 : 1);
 }
 
 // ── Main dispatcher ──────────────────────────────────────────────────
