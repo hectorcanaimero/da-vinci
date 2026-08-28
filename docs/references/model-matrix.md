@@ -30,6 +30,8 @@ Los costos son estimados y viven en `scripts/utils/cost-estimator.mjs`.
 | **Voz TTS multilingüe** | ElevenLabs | `multilingual-v2` 1k chars | $0.30 | Español + inglés + 27 más |
 | **Voz TTS fast/live** | ElevenLabs | `turbo-v2.5` 1k chars | $0.15 | Latencia baja |
 | **Sound effect** | ElevenLabs | `sfx` | $0.08 | Explosiones, ambient, etc. |
+| **Modelo 3D (GLB) desde texto** | Tripo3D | `text-to-model` | $0.20-0.30 | Único proveedor 3D; con textura+PBR sube a $0.30 |
+| **Modelo 3D (GLB) desde imagen** | Tripo3D | `image-to-model` | $0.20-0.30 | Ideal para convertir foto de producto a asset 3D |
 
 ## Reglas de routing (heurística para Claude)
 
@@ -42,6 +44,7 @@ Cuando alguien pide algo visual, aplicar en este orden:
 ¿pidió video?                                     → ver sección Video
 ¿pidió audio/voz/narración?                       → ElevenLabs
 ¿pidió avatar hablando/presentador?               → HeyGen avatar-video
+¿pidió modelo 3D / GLB / asset para juego o AR?   → Tripo3D (text-to-model o image-to-model)
 ¿pasó imágenes como referencia?                   → Gemini nano-banana (edit)
 resto (imagen desde texto)                        → FAL flux-pro-ultra (default)
 ```
@@ -79,6 +82,7 @@ Si el proveedor primario falla:
 | OpenAI gpt-image-2 | Gemini nano-banana | FAL flux-pro |
 | HeyGen avatar-video | (no fallback directo — reportar) | |
 | ElevenLabs | (no fallback directo — reportar) | |
+| Tripo3D modelo 3D | (no fallback directo — único proveedor 3D) | |
 
 ## Notas de costo
 

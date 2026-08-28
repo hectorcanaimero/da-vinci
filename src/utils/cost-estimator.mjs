@@ -54,6 +54,12 @@ export const COST_TABLE = {
   'elevenlabs:tts:1k-chars': 0.30,      // Multilingual v2
   'elevenlabs:tts-turbo:1k-chars': 0.15,
   'elevenlabs:sfx:generation': 0.08,
+
+  // ── Tripo3D (modelo 3D / GLB) ────────────────────────────────────────
+  'tripo:text-to-model': 0.20,            // sin textura
+  'tripo:text-to-model:textured': 0.30,   // con textura + PBR
+  'tripo:image-to-model': 0.20,           // sin textura
+  'tripo:image-to-model:textured': 0.30,  // con textura + PBR
 };
 
 const THRESHOLDS = {

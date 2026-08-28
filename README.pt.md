@@ -2,9 +2,9 @@
 
 # 🎨 Da Vinci
 
-**Gere imagens, SVG, vídeos e áudio — uma skill, seis provedores, roteamento inteligente.**
+**Gere imagens, SVG, vídeos, áudio e modelos 3D — uma skill, sete provedores, roteamento inteligente.**
 
-Uma skill do Claude Code (e CLI standalone) que orquestra OpenAI, Google Gemini, FAL, KIE, HeyGen e ElevenLabs — escolhendo automaticamente o melhor modelo por caso de uso com controle de custos embutido.
+Uma skill do Claude Code (e CLI standalone) que orquestra OpenAI, Google Gemini, FAL, KIE, HeyGen, ElevenLabs e Tripo3D — escolhendo automaticamente o melhor modelo por caso de uso com controle de custos embutido.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/Node-%E2%89%A518-brightgreen)](package.json)
@@ -60,7 +60,7 @@ Você é um desenvolvedor construindo uma landing page. Precisa de uma hero imag
 
 ### Destaques
 
-- 🧠 **Roteamento inteligente de modelos** — Escolhe entre 30+ modelos de 6 provedores baseado na sua intenção (fotorealista → FLUX Pro Ultra, logo vetorial → Recraft V3 SVG, consistência de personagem → Nano-Banana, etc.)
+- 🧠 **Roteamento inteligente de modelos** — Escolhe entre 30+ modelos de 7 provedores baseado na sua intenção (fotorealista → FLUX Pro Ultra, logo vetorial → Recraft V3 SVG, consistência de personagem → Nano-Banana, foto de produto → GLB 3D via Tripo3D, etc.)
 - 💰 **Controle de custos** — Menos de $0.10 roda automático; $0.10-$1 avisa; acima de $1 requer `--force` explícito. Nunca acorde com uma conta surpresa.
 - 🎯 **Baseado em referências** — Passe URLs de imagens ou paths locais como referências. Perfeito para consistência de personagem e transferência de estilo via Nano-Banana.
 - 📋 **Trilha de auditoria** — Toda geração logada em `manifest.json` com prompt, modelo, custo, referências, timestamp.
@@ -79,6 +79,7 @@ Você é um desenvolvedor construindo uma landing page. Precisa de uma hero imag
 | **KIE.ai** | Sora 2, Kling 2.1/2.5, Hailuo, Bytedance, Grok Imagine, Flux 2, Ideogram, Recraft, Topaz, ElevenLabs | Gateway pra modelos que não estão no FAL |
 | **HeyGen** | HyperFrames, Avatar Video | Vídeos com avatar falando, imagens de marca |
 | **ElevenLabs** | Multilingual v2/v1, Turbo v2.5, Flash v2.5, Sound Effects | TTS em 29 idiomas (incluindo PT-BR), SFX |
+| **Tripo3D** | Text-to-Model, Image-to-Model | Assets 3D (GLB) para jogos, AR, impressão 3D |
 
 Matriz completa com casos de uso e custos: [`docs/references/model-matrix.md`](docs/references/model-matrix.md)
 
@@ -97,7 +98,7 @@ cp .env.example ~/.config/da-vinci/.env
 chmod 600 ~/.config/da-vinci/.env
 ```
 
-Obter keys em: [OpenAI](https://platform.openai.com/api-keys) · [Gemini](https://aistudio.google.com/apikey) · [FAL](https://fal.ai/dashboard/keys) · [KIE](https://kie.ai) · [HeyGen](https://app.heygen.com/settings?nav=API) · [ElevenLabs](https://elevenlabs.io/app/settings/api-keys)
+Obter keys em: [OpenAI](https://platform.openai.com/api-keys) · [Gemini](https://aistudio.google.com/apikey) · [FAL](https://fal.ai/dashboard/keys) · [KIE](https://kie.ai) · [HeyGen](https://app.heygen.com/settings?nav=API) · [ElevenLabs](https://elevenlabs.io/app/settings/api-keys) · [Tripo3D](https://platform.tripo3d.ai/api-keys)
 
 ### Opção B — Infisical (recomendado para times)
 
@@ -174,6 +175,8 @@ node src/generate.mjs tts \
   --voice "21m00Tcm4TlvDq8ikWAM"
 
 # Listar vozes disponíveis
+node src/generate.mjs model-3d --prompt "uma espada medieval low poly"
+
 node src/generate.mjs list-voices --provider elevenlabs
 
 # Estimar custo sem executar (dry-run)
@@ -219,7 +222,8 @@ da-vinci/
 │   │   ├── fal.mjs
 │   │   ├── kie.mjs
 │   │   ├── heygen.mjs
-│   │   └── elevenlabs.mjs
+│   │   ├── elevenlabs.mjs
+│   │   └── tripo.mjs
 │   └── utils/
 │       ├── secrets.mjs          Auto-detecta Infisical/dotenv/env
 │       ├── infisical.mjs        HTTP client pra Infisical /api/v3

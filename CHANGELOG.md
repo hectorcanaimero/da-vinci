@@ -5,6 +5,11 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), [SemVer](https
 
 ## [Unreleased]
 
+### Added
+- Tripo3D provider (`src/providers/tripo.mjs`) — text-to-3D and image-to-3D generation, GLB output, via the `model-3d` intent
+- `TRIPO_API_KEY` as a 7th expected secret (Infisical / `.env` / env var)
+- Cost table entries for `tripo:text-to-model` and `tripo:image-to-model` (textured and untextured)
+
 ## [1.0.0] — 2026-08-10
 
 ### Initial release 🎨

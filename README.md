@@ -2,9 +2,9 @@
 
 # 🎨 Da Vinci
 
-**Generate images, SVG, videos, and audio — one skill, six providers, smart routing.**
+**Generate images, SVG, videos, audio, and 3D models — one skill, seven providers, smart routing.**
 
-A Claude Code skill (and standalone CLI) that orchestrates OpenAI, Google Gemini, FAL, KIE, HeyGen, and ElevenLabs — automatically picking the best model per use case with cost gating built in.
+A Claude Code skill (and standalone CLI) that orchestrates OpenAI, Google Gemini, FAL, KIE, HeyGen, ElevenLabs, and Tripo3D — automatically picking the best model per use case with cost gating built in.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/Node-%E2%89%A518-brightgreen)](package.json)
@@ -60,7 +60,7 @@ You're a developer building a landing page. You need a hero image, a logo, and a
 
 ### Highlights
 
-- 🧠 **Smart model routing** — Chooses between 30+ models across 6 providers based on your intent (photorealistic → FLUX Pro Ultra, vector logo → Recraft V3 SVG, character consistency → Nano-Banana, etc.)
+- 🧠 **Smart model routing** — Chooses between 30+ models across 7 providers based on your intent (photorealistic → FLUX Pro Ultra, vector logo → Recraft V3 SVG, character consistency → Nano-Banana, product photo → 3D GLB via Tripo3D, etc.)
 - 💰 **Cost gating** — Under $0.10 runs automatically; $0.10-$1 warns; over $1 requires explicit `--force`. Never wake up to a surprise bill.
 - 🎯 **Reference-driven** — Pass image URLs or local paths as references. Perfect for character consistency and style transfer via Nano-Banana.
 - 📋 **Audit trail** — Every generation logged to `manifest.json` with prompt, model, cost, references, timestamp.
@@ -79,6 +79,7 @@ You're a developer building a landing page. You need a hero image, a logo, and a
 | **KIE.ai** | Sora 2, Kling 2.1/2.5, Hailuo, Bytedance, Grok Imagine, Flux 2, Ideogram, Recraft, Topaz, ElevenLabs | Gateway to models not on FAL |
 | **HeyGen** | HyperFrames, Avatar Video | Talking-head videos, brand images |
 | **ElevenLabs** | Multilingual v2/v1, Turbo v2.5, Flash v2.5, Sound Effects | TTS in 29 languages, SFX |
+| **Tripo3D** | Text-to-Model, Image-to-Model | 3D assets (GLB) for games, AR, 3D printing |
 
 Full matrix with use cases and costs: [`docs/references/model-matrix.md`](docs/references/model-matrix.md)
 
@@ -97,7 +98,7 @@ cp .env.example ~/.config/da-vinci/.env
 chmod 600 ~/.config/da-vinci/.env
 ```
 
-Get keys from: [OpenAI](https://platform.openai.com/api-keys) · [Gemini](https://aistudio.google.com/apikey) · [FAL](https://fal.ai/dashboard/keys) · [KIE](https://kie.ai) · [HeyGen](https://app.heygen.com/settings?nav=API) · [ElevenLabs](https://elevenlabs.io/app/settings/api-keys)
+Get keys from: [OpenAI](https://platform.openai.com/api-keys) · [Gemini](https://aistudio.google.com/apikey) · [FAL](https://fal.ai/dashboard/keys) · [KIE](https://kie.ai) · [HeyGen](https://app.heygen.com/settings?nav=API) · [ElevenLabs](https://elevenlabs.io/app/settings/api-keys) · [Tripo3D](https://platform.tripo3d.ai/api-keys)
 
 ### Option B — Infisical (recommended for teams)
 
@@ -173,6 +174,12 @@ node src/generate.mjs tts \
   --text "Welcome to AgendaZap" \
   --voice "21m00Tcm4TlvDq8ikWAM"
 
+# 3D model (GLB) from text — Tripo3D
+node src/generate.mjs model-3d --prompt "a low poly medieval sword"
+
+# 3D model (GLB) from a reference image — Tripo3D
+node src/generate.mjs model-3d --refs "https://example.com/product.png"
+
 # List available voices
 node src/generate.mjs list-voices --provider elevenlabs
 
@@ -217,7 +224,8 @@ da-vinci/
 │   │   ├── fal.mjs
 │   │   ├── kie.mjs
 │   │   ├── heygen.mjs
-│   │   └── elevenlabs.mjs
+│   │   ├── elevenlabs.mjs
+│   │   └── tripo.mjs
 │   └── utils/
 │       ├── secrets.mjs          Auto-detects Infisical/dotenv/env
 │       ├── infisical.mjs        HTTP client for Infisical /api/v3
