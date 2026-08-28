@@ -12,7 +12,8 @@ import { loadDotenv, searchPaths as dotenvSearchPaths } from './dotenv.mjs';
  * Override explícito con DAVINCI_SECRETS_SOURCE=infisical|dotenv|env
  *
  * Las 6 keys que Da Vinci espera:
- *   OPENAI_API_KEY, GEMINI_API_KEY, FAL_API_KEY, KIE_API_KEY, HEYGEN_API_KEY, ELEVENLABS_API_KEY
+ *   OPENAI_API_KEY, GEMINI_API_KEY, FAL_API_KEY, KIE_API_KEY, HEYGEN_API_KEY,
+ *   ELEVENLABS_API_KEY, TRIPO_API_KEY
  *
  * Las 3 primeras son necesarias para el 80% de casos; el resto son opcionales.
  */
@@ -24,6 +25,7 @@ const EXPECTED_KEYS = [
   'KIE_API_KEY',
   'HEYGEN_API_KEY',
   'ELEVENLABS_API_KEY',
+  'TRIPO_API_KEY',
 ];
 
 const INFISICAL_ENV = [

@@ -6,7 +6,7 @@
  *   node generate.mjs <intent> [--flag=value ...]
  *
  * Intents soportados:
- *   image, svg, video, avatar-video, tts, sfx, bg-remove, upscale,
+ *   image, svg, video, model-3d, avatar-video, tts, sfx, bg-remove, upscale,
  *   list-voices, list-avatars
  *
  * Ver referencias/model-matrix.md para la matriz completa de decisión.
@@ -25,6 +25,7 @@ import * as gemini from './providers/gemini.mjs';
 import * as kie from './providers/kie.mjs';
 import * as heygen from './providers/heygen.mjs';
 import * as elevenlabs from './providers/elevenlabs.mjs';
+import * as tripo from './providers/tripo.mjs';
 
 // ── CLI parsing ──────────────────────────────────────────────────────
 
@@ -46,6 +47,10 @@ const { positionals, values: flags } = parseArgs({
     refs:      { type: 'string' },              // "url1,url2,..."
     image:     { type: 'string' },              // single URL for bg-remove/upscale
     out:       { type: 'string' },              // output path override
+    texture:   { type: 'string', default: 'true' },  // model-3d: --texture false para desactivar
+    pbr:       { type: 'string', default: 'true' },  // model-3d: --pbr false para desactivar
+    'face-limit': { type: 'string' },           // model-3d: límite de polígonos
+    style:     { type: 'string' },              // model-3d: estilo (ver docs Tripo)
     'dry-run': { type: 'boolean', default: false },
     force:     { type: 'boolean', default: false },
     help:      { type: 'boolean', default: false },
@@ -76,6 +81,7 @@ async function main() {
     case 'image':          return runImage(references);
     case 'svg':            return runSvg();
     case 'video':          return runVideo(references);
+    case 'model-3d':       return runModel3d(references);
     case 'avatar-video':   return runAvatarVideo();
     case 'tts':            return runTts();
     case 'sfx':            return runSfx();
@@ -223,6 +229,35 @@ async function runVideo(references) {
   throw new Error(`Provider desconocido para video: ${provider}`);
 }
 
+async function runModel3d(references) {
+  const model = flags.model; // opcional — si se omite, Tripo usa el default de la cuenta
+  const texture = flags.texture !== 'false';
+  const pbr = flags.pbr !== 'false';
+  const faceLimit = flags['face-limit'] ? Number(flags['face-limit']) : undefined;
+  const fromImage = references.length > 0;
+
+  const costK = fromImage
+    ? (texture ? 'tripo:image-to-model:textured' : 'tripo:image-to-model')
+    : (texture ? 'tripo:text-to-model:textured' : 'tripo:text-to-model');
+  const cost = checkCost(costK, 1);
+
+  let result;
+  let promptLog;
+  if (fromImage) {
+    const ref = references[0];
+    result = await tripo.generateFromImage({ buffer: ref.buffer, mime: ref.mime, model, texture, pbr, faceLimit });
+    promptLog = flags.prompt ?? `image-to-model (${flags.refs})`;
+  } else {
+    const prompt = required('prompt');
+    result = await tripo.generateFromText({ prompt, model, texture, pbr, faceLimit, style: flags.style });
+    promptLog = prompt;
+  }
+
+  const outputPath = await saveRemoteAsset(result.modelUrl, 'model', 'glb');
+  await log({ prompt: promptLog, provider: 'tripo', model: model ?? 'default', outputPath, cost, references: flags.refs?.split(',') });
+  return outputPath;
+}
+
 async function runAvatarVideo() {
   const avatarId = required('avatar');
   const voiceId = required('voice');
@@ -360,6 +395,7 @@ const MIME_TO_EXT = {
   'audio/mpeg':    'mp3',
   'audio/wav':     'wav',
   'audio/mp4':     'm4a',
+  'model/gltf-binary': 'glb',
 };
 
 async function saveRemoteAsset(url, kind, fallbackExt) {
@@ -429,6 +465,8 @@ Intents:
   image          --provider {fal|openai|gemini|kie|heygen} --model X --prompt "..." [--aspect] [--n]
   svg            --prompt "..." (siempre FAL Recraft V3 SVG)
   video          --provider {fal|gemini|kie} --model X --prompt "..." [--aspect] [--duration]
+  model-3d       --prompt "..." (texto) o --refs URL (imagen) → GLB (Tripo3D)
+                 [--texture true|false] [--pbr true|false] [--face-limit N] [--style X]
   avatar-video   --avatar ID --voice ID --script "..." (HeyGen)
   tts            --text "..." --voice ID [--model multilingual-v2] (ElevenLabs)
   sfx            --text "..." [--duration N] (ElevenLabs)

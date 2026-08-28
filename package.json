@@ -1,7 +1,7 @@
 {
   "name": "da-vinci",
-  "version": "1.0.0",
-  "description": "Universal visual generation skill for Claude Code — images, SVG, videos, audio via OpenAI, Gemini, FAL, KIE, HeyGen, and ElevenLabs with smart cost gating.",
+  "version": "1.1.0",
+  "description": "Universal visual generation skill for Claude Code — images, SVG, videos, audio, and 3D models via OpenAI, Gemini, FAL, KIE, HeyGen, ElevenLabs, and Tripo3D with smart cost gating.",
   "type": "module",
   "main": "src/generate.mjs",
   "bin": {
@@ -37,7 +37,12 @@
     "fal-ai",
     "openai",
     "gemini",
-    "infisical"
+    "infisical",
+    "tripo3d",
+    "3d-generation",
+    "text-to-3d",
+    "image-to-3d",
+    "glb"
   ],
   "author": "Héctor Rodríguez",
   "license": "Apache-2.0",
