@@ -28,7 +28,7 @@ Exemplos reais gerados end-to-end via Da Vinci:
 <td width="33%" align="center">
   <img src="docs/examples/01-flux-schnell-tooth.png" width="100%" alt="Ilustração minimalista de um dente"><br>
   <sub><b>FAL FLUX Schnell</b> · $0.003 · 4.7s</sub><br>
-  <sub><i>"Ilustração de dente minimalista, tons azuis flat"</i></sub>
+  <sub><i>"Ilustração minimalista de dente, tons azuis flat"</i></sub>
 </td>
 <td width="33%" align="center">
   <img src="docs/examples/02-recraft-svg-logo-preview.png" width="100%" alt="Logo SVG calendário e relógio"><br>
@@ -54,7 +54,7 @@ Você é um desenvolvedor construindo uma landing page. Precisa de uma hero imag
 - Comparar preços entre 5+ provedores
 - Escolher o modelo errado para o job (gastando demais ou tendo resultados medíocres)
 - Gerenciar 6 clients de API diferentes + fluxos de auth
-- Trackear manualmente o que você gastou
+- Rastrear manualmente o que você gastou
 
 **Com Da Vinci, o Claude faz tudo isso pra você.** Você diz "faz uma hero image pra landing de uma clínica dental", ele escolhe o melhor modelo, estima custo, gera, salva em `assets/generated/`, e loga no `manifest.json`.
 
@@ -62,7 +62,7 @@ Você é um desenvolvedor construindo uma landing page. Precisa de uma hero imag
 
 - 🧠 **Roteamento inteligente de modelos** — Escolhe entre 30+ modelos de 7 provedores baseado na sua intenção (fotorealista → FLUX Pro Ultra, logo vetorial → Recraft V3 SVG, consistência de personagem → Nano-Banana, foto de produto → GLB 3D via Tripo3D, etc.)
 - 💰 **Controle de custos** — Menos de $0.10 roda automático; $0.10-$1 avisa; acima de $1 requer `--force` explícito. Nunca acorde com uma conta surpresa.
-- 🎯 **Baseado em referências** — Passe URLs de imagens ou paths locais como referências. Perfeito para consistência de personagem e transferência de estilo via Nano-Banana.
+- 🎯 **Baseado em referências** — Passe URLs de imagens ou caminhos locais como referências. Perfeito para consistência de personagem e transferência de estilo via Nano-Banana.
 - 📋 **Trilha de auditoria** — Toda geração logada em `manifest.json` com prompt, modelo, custo, referências, timestamp.
 - 🔐 **Secrets flexíveis** — Auto-detecta Infisical (self-hosted ou cloud), arquivo `.env` local ou variáveis de ambiente do shell. Sem lock-in.
 - ⚡ **Zero dependências** — Node.js 18+ puro. Não precisa de `npm install`.
@@ -78,16 +78,37 @@ Você é um desenvolvedor construindo uma landing page. Precisa de uma hero imag
 | **FAL.ai** | FLUX (Schnell/Dev/Pro/Ultra/2), Recraft V3 (raster & SVG), Ideogram v2/v3, Kling 1.6/2.1, Luma Dream Machine, Minimax Hailuo, Sora 2, Veo 3.1, Wan Turbo, BRIA, Clarity Upscaler | Quase tudo — o canivete suíço |
 | **KIE.ai** | Sora 2, Kling 2.1/2.5, Hailuo, Bytedance, Grok Imagine, Flux 2, Ideogram, Recraft, Topaz, ElevenLabs | Gateway pra modelos que não estão no FAL |
 | **HeyGen** | HyperFrames, Avatar Video | Vídeos com avatar falando, imagens de marca |
-| **ElevenLabs** | Multilingual v2/v1, Turbo v2.5, Flash v2.5, Sound Effects | TTS em 29 idiomas (incluindo PT-BR), SFX |
+| **ElevenLabs** | Multilingual v2/v1, Turbo v2.5, Flash v2.5, Sound Effects | TTS em 29 idiomas, SFX |
 | **Tripo3D** | Text-to-Model, Image-to-Model | Assets 3D (GLB) para jogos, AR, impressão 3D |
 
 Matriz completa com casos de uso e custos: [`docs/references/model-matrix.md`](docs/references/model-matrix.md)
 
 ---
 
+## Instalação
+
+### Global (recomendado)
+
+```bash
+npm install -g da-vinci
+davinci --help
+davinci serve                # inicia dashboard + API em http://127.0.0.1:20130
+```
+
+### Local (desenvolvimento)
+
+```bash
+git clone https://github.com/hectorcanaimero/da-vinci.git
+cd da-vinci
+npm ci && npm run build:ui
+npm run install:setup        # setup interativo
+node src/generate.mjs --help
+npm start image --provider fal --model flux-schnell --prompt "test" --dry-run
+```
+
 ## Setup
 
-Escolha UMA opção:
+Escolha UMA opção para API keys:
 
 ### Opção A — Arquivo `.env` (mais simples)
 
@@ -112,7 +133,7 @@ export DAVINCI_PROJECT_ID="..."
 export DAVINCI_ENV="prod"
 ```
 
-Da Vinci auto-detecta e busca as API keys via Infisical Universal Auth.
+Da Vinci auto-detecta e busca as API keys via Infisical Universal Auth. Veja [`docs/references/infisical-setup.md`](docs/references/model-matrix.md) para o guia completo.
 
 ### Opção C — Variáveis de ambiente diretas (CI/CD)
 
@@ -127,8 +148,7 @@ Perfeito para GitHub Actions, Docker ou scripts.
 ### Verificar
 
 ```bash
-node src/generate.mjs image --provider fal --model flux-schnell \
-  --prompt "test" --dry-run --verbose
+davinci image --provider fal --model flux-schnell --prompt "test" --dry-run --verbose
 # Output: 🔑 Secretos cargados desde: dotenv (...) — keys: ...
 ```
 
@@ -141,7 +161,7 @@ node src/generate.mjs image --provider fal --model flux-schnell \
 Fale direto com o Claude:
 
 - *"Da Vinci, gera uma hero image pra landing de uma clínica dental, moderno e minimalista"*
-- *"Da Vinci, preciso de um logo em SVG pra Rupies"*
+- *"Da Vinci, preciso de um logo em SVG pra AgendaZap"*
 - *"Da Vinci, edita essa foto e muda o fundo pra praia"* (cole URL da imagem)
 - *"Da Vinci, faz um vídeo de 5 segundos do produto girando"*
 
@@ -169,14 +189,18 @@ node src/generate.mjs video \
   --provider gemini --model veo-3 \
   --prompt "..." --duration 5 --force
 
-# Text-to-speech (PT-BR funciona perfeito)
+# Text-to-speech
 node src/generate.mjs tts \
   --text "Bem-vindo ao AgendaZap" \
   --voice "21m00Tcm4TlvDq8ikWAM"
 
-# Listar vozes disponíveis
+# Modelo 3D (GLB) do texto — Tripo3D
 node src/generate.mjs model-3d --prompt "uma espada medieval low poly"
 
+# Modelo 3D (GLB) de uma imagem de referência — Tripo3D
+node src/generate.mjs model-3d --refs "https://example.com/product.png"
+
+# Listar vozes disponíveis
 node src/generate.mjs list-voices --provider elevenlabs
 
 # Estimar custo sem executar (dry-run)
@@ -185,6 +209,139 @@ node src/generate.mjs video --provider fal --model kling-2.1-master \
 ```
 
 Referência completa de comandos: `node src/generate.mjs --help`
+
+---
+
+## Dashboard (`davinci serve`)
+
+Inicie com `davinci serve` para abrir o dashboard local em `http://127.0.0.1:20130`.
+
+### Quatro Seções
+
+1. **Studio** — Gere novos assets (imagem, vídeo, SVG, modelo 3D, TTS, etc.). Mostra estimativas de custo e status de jobs em tempo real.
+
+2. **Biblioteca** — Navegue todas as gerações (global e com escopo de projeto). Busque por prompt, provedor, modelo. Marque favoritos, delete com cleanup opcional de arquivo, inspecione linhagem (gerações que usaram este asset como referência).
+
+3. **Provedores** — Gerencie API keys. Mostra status de conexão para cada um dos 7 provedores. Adicione keys diretamente (salvas em `~/.davinci/config.json`) ou use Infisical.
+
+4. **Gastos** — Visualize tendências de custos. Filtre por intervalo de data, agrupe por provedor/modelo/dia. Veja alertas de orçamento diário e total anual.
+
+### API Server
+
+O mesmo servidor também expõe uma API REST (útil para CI/CD, automação ou frontends customizados). URL base: `http://127.0.0.1:20130` (padrão).
+
+Todas as rotas requerem **API key** opcional (para exposição em rede). Configure em:
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 20130,
+  "apiKey": "sk-...",
+  "dailyBudgetUsd": 10,
+  "concurrency": 3
+}
+```
+
+Depois use o header `X-Davinci-API-Key`:
+
+```bash
+curl http://<host>:20130/api/health \
+  -H "X-Davinci-API-Key: sk-..."
+```
+
+### Rotas da API
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| GET | `/api/health` | Status do servidor + versão |
+| GET | `/api/models` | Liste 30+ modelos com custos; filtre por `?kind=image` |
+| POST | `/api/estimate` | Estime custo: `{ intent, prompt, provider, model, ... }` → `{ costUsd, level, ... }` |
+| POST | `/api/generations` | Enfileire geração: `{ ... }` → `{ job: { id, status, ... } }` |
+| GET | `/api/jobs` | Liste jobs (filtre por `?status=pending`); paginação com `?limit` |
+| GET | `/api/jobs/:id` | Obtenha um job (siga campo `result` para asset ID quando pronto) |
+| GET | `/api/library` | Liste todas as gerações; filtre por `?favorite=true`, projeto, intervalo de data |
+| GET | `/api/library/:id` | Obtenha um asset + linhagem (quais gerações usaram como referência) |
+| PATCH | `/api/library/:id` | Atualize asset: `{ favorite: boolean }` |
+| DELETE | `/api/library/:id` | Delete asset; `?file=true` também deleta arquivo |
+| GET | `/api/spend` | Resumo de custos; `?groupBy=day\|provider\|model`, filtros de data |
+| POST | `/api/import` | Importe manifest: `{ path: "..." }` → `{ imported, skipped }` |
+
+### Exemplo: Compatibilidade com SDK OpenAI
+
+Use Da Vinci como um endpoint compatível com OpenAI:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="sk-...",           # (opcional, se servidor tem apiKey configurado)
+    base_url="http://127.0.0.1:20130/v1",
+)
+
+# Funciona como OpenAI mas roteia pra Da Vinci (escolhe melhor modelo por intenção)
+response = client.images.generate(
+    prompt="ilustração minimalista de dente",
+    n=1,
+)
+image_url = response.data[0].url
+```
+
+Ou com cURL:
+
+```bash
+curl http://127.0.0.1:20130/v1/images/generations \
+  -H "Authorization: Bearer sk-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "ilustração minimalista de dente",
+    "n": 1
+  }'
+```
+
+---
+
+## Biblioteca Global (`~/.davinci/`)
+
+Toda geração é salva na biblioteca global (banco de dados + arquivos). Use via CLI ou dashboard.
+
+### Estrutura de Diretórios
+
+```
+~/.davinci/
+├── config.json              Suas configurações (porta, host, apiKey, orçamento, etc.)
+├── orch.db                  Banco SQLite (gerações, linhagem, favoritos)
+└── assets/
+    ├── <id>/
+    │   ├── artifact.{jpg,png,mp4,glb,mp3}
+    │   ├── metadata.json
+    │   └── generation.json
+    └── ...
+```
+
+### Referencie Gerações em Prompts
+
+Use `--refs davinci:<id>` para referenciar uma geração salva:
+
+```bash
+davinci image --provider gemini --model nano-banana \
+  --prompt "mesmo estilo mas em uma praia" \
+  --refs davinci:84ac4a32-5c48-4f8e-8f4c-a8f8c8f8c8f8
+```
+
+Útil para construir sobre trabalho anterior (consistência de personagem, encadeamento de estilo, refinamento iterativo).
+
+---
+
+## Comando Import
+
+Migre de manifests locais de projeto para a biblioteca global:
+
+```bash
+davinci import ./assets/generated/manifest.json
+# Output: { imported: 42, skipped: 3 }
+```
+
+Cada asset é copiado pra `~/.davinci/assets/` com toda linhagem preservada.
 
 ---
 
@@ -207,9 +364,7 @@ Ajuste os thresholds editando `src/utils/cost-estimator.mjs`.
 ```
 da-vinci/
 ├── LICENSE                      Apache 2.0
-├── README.md                    English
-├── README.pt.md                 Português
-├── README.es.md                 Español
+├── README.md
 ├── package.json
 ├── .env.example                 Template — copie pra ~/.config/da-vinci/.env
 ├── .gitignore
@@ -241,7 +396,7 @@ da-vinci/
 
 ---
 
-## Trilha de Auditoria
+## Manifest & Trilha de Auditoria
 
 Toda geração é adicionada em `<projectRoot>/assets/generated/manifest.json`:
 
@@ -302,7 +457,6 @@ Guia completo: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - [ ] Comando `variations` pra regenerar o último asset com nova seed
 - [ ] Integração de auto-upload com Cloudflare Images / R2
 - [ ] Fallback de modelo local (Ollama Vision + SD) pra uso offline
-- [ ] Dashboard Web UI pra navegar o manifest
 
 ---
 
