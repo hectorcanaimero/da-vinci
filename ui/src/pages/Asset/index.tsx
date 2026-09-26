@@ -5,6 +5,7 @@ import AssetViewer from '../../components/viewers/AssetViewer';
 import { useServerEvents } from '../../sse';
 import type { Generation } from '../../types';
 import Lineage from './Lineage';
+import Actions from './Actions';
 
 type Detail = Generation & { parents: Generation[]; children: Generation[] };
 
@@ -57,7 +58,7 @@ export default function Asset() {
           <div><button onClick={remove}>Borrar</button> <button onClick={() => setConfirming(false)}>Cancelar</button></div>
         </dialog>
       )}
-      <div data-slot="actions" />
+      <Actions gen={d} />
       <h3>Prompt</h3>
       <p style={{ whiteSpace: 'pre-wrap' }}>{d.prompt ?? '—'}</p>
       {d.prompt && <button onClick={() => copy(d.prompt!)}>Copiar prompt</button>}
