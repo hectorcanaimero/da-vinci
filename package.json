@@ -1,6 +1,6 @@
 {
   "name": "da-vinci",
-  "version": "1.1.0",
+  "version": "2.0.0",
   "description": "Universal visual generation skill for Claude Code — images, SVG, videos, audio, and 3D models via OpenAI, Gemini, FAL, KIE, HeyGen, ElevenLabs, and Tripo3D with smart cost gating.",
   "type": "module",
   "main": "src/generate.mjs",

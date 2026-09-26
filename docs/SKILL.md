@@ -7,7 +7,7 @@ description: >
 license: Apache-2.0
 metadata:
   author: gentleman-programming
-  version: "1.1"
+  version: "2.0"
 ---
 
 ## When to Use
@@ -20,6 +20,25 @@ metadata:
 - Usuario pide un video de avatar hablando (para RRHH, ventas, tutoriales)
 - Usuario pide un modelo 3D, GLB, asset para juego/AR/impresión 3D, desde texto o desde una imagen de referencia
 - Usuario pasa URLs de imágenes/videos para "inspirarte" o "usar como referencia"
+
+## Global Library
+
+**Toda generación queda guardada en la biblioteca global** (`~/.davinci/`), no solo en el proyecto local. Esto significa:
+
+- Accedé a tus assets desde cualquier proyecto
+- Usá generaciones previas como referencias en nuevas generaciones
+- Consultá costo total y tendencias desde el dashboard (`davinci serve`)
+- Exportá o buscá en `davinci import` desde manifestos de proyectos anteriores
+
+Use `--refs davinci:<id>` para referenciar un asset guardado:
+
+```bash
+davinci image --provider gemini --model nano-banana \
+  --prompt "misma pose pero en la playa" \
+  --refs davinci:84ac4a32-5c48-4f8e-8f4c-a8f8c8f8c8f8
+```
+
+Ideal para iteración: cambios de estilo, character consistency, refinamientos sobre trabajo anterior.
 
 ## Critical Patterns
 
