@@ -52,7 +52,7 @@ after(() => {
 test('GET /api/providers devuelve estado de todos los proveedores', async () => {
   const res = await fetch(`${base}/api/providers`);
   assert.equal(res.status, 200);
-  const data = await res.json();
+  const { items: data } = await res.json();
   assert.ok(Array.isArray(data));
   assert.equal(data.length, 7);
   for (const p of data) {
@@ -67,7 +67,7 @@ test('GET /api/providers devuelve estado de todos los proveedores', async () => 
 
 test('GET /api/providers sin keys muestra status "missing"', async () => {
   const res = await fetch(`${base}/api/providers`);
-  const data = await res.json();
+  const { items: data } = await res.json();
   for (const p of data) {
     assert.equal(p.status, 'missing');
     assert.equal(p.keyHint, null);
