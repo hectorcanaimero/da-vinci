@@ -12,11 +12,23 @@
   },
   "scripts": {
     "start": "node src/generate.mjs",
+    "build:ui": "npm --prefix ui ci && npm --prefix ui run build",
+    "prepublishOnly": "npm run build:ui && npm test",
     "install:setup": "node install.mjs",
     "lint": "node --check src/generate.mjs && node --check src/utils/*.mjs && node --check src/providers/*.mjs && node --check src/core/*.mjs && node --check src/library/*.mjs",
     "test": "node --test test/*.test.mjs",
     "test:secrets": "node -e \"import('./src/utils/secrets.mjs').then(m => m.loadSecrets().then(s => console.log('OK. Source:', s.source, 'Keys:', Object.keys(s.secrets))))\""
   },
+  "files": [
+    "src/",
+    "dist/ui/",
+    "SKILL.md",
+    "install.mjs",
+    "README*.md",
+    "LICENSE",
+    ".env.example",
+    "docs/references/"
+  ],
   "keywords": [
     "claude-code",
     "claude-skill",
