@@ -83,12 +83,24 @@ export async function loadSecrets() {
 }
 
 /**
+ * Origen de cada key inyectada: 'env' | 'dotenv:<ruta>' | 'infisical'.
+ * Lo llena injectSecretsIntoEnv; otros módulos pueden registrar el suyo (ej. saveKey).
+ */
+export const keySources = new Map();
+
+/**
  * Inyecta las keys en process.env (sin pisar las que ya existan) y devuelve metadata.
  */
 export async function injectSecretsIntoEnv() {
   const { source, path, secrets } = await loadSecrets();
+  const label = source === 'dotenv' ? `dotenv:${path}` : source;
   for (const [k, v] of Object.entries(secrets)) {
-    if (!process.env[k]) process.env[k] = v;
+    if (!process.env[k]) {
+      process.env[k] = v;
+      keySources.set(k, label);
+    } else if (!keySources.has(k)) {
+      keySources.set(k, 'env');
+    }
   }
   return { source, path, keys: Object.keys(secrets) };
 }
