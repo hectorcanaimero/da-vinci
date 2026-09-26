@@ -43,14 +43,15 @@ En el `package.json` raíz: scripts `build:ui` (`npm --prefix ui ci && npm
 `ui/node_modules/`.
 
 Done when: `npm run build:ui` termina sin errores ni warnings de TS,
-`node src/generate.mjs serve --no-open` sirve el dashboard en `/`, las 5
-rutas navegan (incluido recargar en `/spend`), y `npm pack --dry-run` lista
-`dist/ui/index.html` y no lista `ui/`.
+`npm --prefix ui run preview` muestra el dashboard y las 5 rutas navegan
+(incluido recargar en `/spend`), y `npm pack --dry-run` lista
+`dist/ui/index.html` y no lista `ui/`. No depende del servidor: que
+`davinci serve` sirva `dist/ui` lo verifica F3.1.T2.
 
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 3h
 - **Reason**: Scaffolding de front estándar.
-- **Dependencies**: F2.1.T3
+- **Dependencies**:
 - **Files**:
   - `ui/package.json`
   - `ui/package-lock.json`
@@ -86,14 +87,15 @@ montar. `ApiKeyGate.tsx`: si una llamada da 401, pide la API key, la guarda
 en `localStorage` (con try/catch) y reintenta. Montar ambos en
 `Layout.tsx`/`App.tsx`.
 
-Done when: `npm run build:ui` pasa sin errores de TS y, con el servidor
-corriendo, lanzar un job con `curl` a `POST /api/generations` hace aparecer
+Done when: `npm run build:ui` pasa sin errores de TS,
+`node src/generate.mjs serve --no-open` sirve el dashboard en `/` (recargar
+en `/spend` también funciona) y, con el servidor corriendo, lanzar un job con `curl` a `POST /api/generations` hace aparecer
 el trabajo en la bandeja y pasar a "listo" sin recargar.
 
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 3h
 - **Reason**: Capa de datos del front sobre contrato fijo.
-- **Dependencies**: F3.1.T1
+- **Dependencies**: F3.1.T1, F2.1.T3
 - **Files**:
   - `ui/src/types.ts`
   - `ui/src/api.ts`

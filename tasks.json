@@ -311,13 +311,11 @@
       "id": "F3.1.T1",
       "phase": 3,
       "title": "Proyecto Vite y build",
-      "description": "Crear el proyecto en `ui/` (Vite, React, TypeScript estricto,\n`react-router-dom`). `vite build` escribe en `../dist/ui` con `base: '/'`;\nen dev, proxy de `/api`, `/v1` y `/files` a `http://127.0.0.1:20130`.\n`App.tsx` registra todas las rutas del SPA apuntando a páginas stub\n(`ui/src/pages/{Library,Asset,Studio,Providers,Spend}/index.tsx`, cada una\ncon un título), `Layout.tsx` con navegación lateral (colapsa a barra\ninferior en móvil) y un stub `ui/src/components/JobsTray.tsx`. `styles.css`\ncon los tokens de color, tipografía y espaciado.\n\nEn el `package.json` raíz: scripts `build:ui` (`npm --prefix ui ci \u0026\u0026 npm\n--prefix ui run build`) y `prepublishOnly` (`npm run build:ui \u0026\u0026 npm test`),\n`files` con `src/`, `dist/ui/`, `SKILL.md`, `install.mjs`, `README*.md`,\n`LICENSE`, `.env.example`, `docs/references/`. En `.gitignore`: `dist/` y\n`ui/node_modules/`.\n\nDone when: `npm run build:ui` termina sin errores ni warnings de TS,\n`node src/generate.mjs serve --no-open` sirve el dashboard en `/`, las 5\nrutas navegan (incluido recargar en `/spend`), y `npm pack --dry-run` lista\n`dist/ui/index.html` y no lista `ui/`.",
+      "description": "Crear el proyecto en `ui/` (Vite, React, TypeScript estricto,\n`react-router-dom`). `vite build` escribe en `../dist/ui` con `base: '/'`;\nen dev, proxy de `/api`, `/v1` y `/files` a `http://127.0.0.1:20130`.\n`App.tsx` registra todas las rutas del SPA apuntando a páginas stub\n(`ui/src/pages/{Library,Asset,Studio,Providers,Spend}/index.tsx`, cada una\ncon un título), `Layout.tsx` con navegación lateral (colapsa a barra\ninferior en móvil) y un stub `ui/src/components/JobsTray.tsx`. `styles.css`\ncon los tokens de color, tipografía y espaciado.\n\nEn el `package.json` raíz: scripts `build:ui` (`npm --prefix ui ci \u0026\u0026 npm\n--prefix ui run build`) y `prepublishOnly` (`npm run build:ui \u0026\u0026 npm test`),\n`files` con `src/`, `dist/ui/`, `SKILL.md`, `install.mjs`, `README*.md`,\n`LICENSE`, `.env.example`, `docs/references/`. En `.gitignore`: `dist/` y\n`ui/node_modules/`.\n\nDone when: `npm run build:ui` termina sin errores ni warnings de TS,\n`npm --prefix ui run preview` muestra el dashboard y las 5 rutas navegan\n(incluido recargar en `/spend`), y `npm pack --dry-run` lista\n`dist/ui/index.html` y no lista `ui/`. No depende del servidor: que\n`davinci serve` sirva `dist/ui` lo verifica F3.1.T2.",
       "model": "claude/claude-sonnet-5",
       "reason": "Scaffolding de front estándar.",
       "status": "backlog",
-      "dependencies": [
-        "F2.1.T3"
-      ],
+      "dependencies": [],
       "estimateHours": 3.0,
       "files": [
         "ui/package.json",
@@ -345,12 +343,13 @@
       "id": "F3.1.T2",
       "phase": 3,
       "title": "Cliente de API, SSE y bandeja de trabajos",
-      "description": "`ui/src/types.ts`: tipos TS de `Generation`, `Job`, `Estimate`,\n`GenerationRequest`, `ModelInfo`, `ProviderStatus`, `SpendRow` copiados\nde *Interfaces*. `ui/src/api.ts`: una función por ruta de `/api`, que lanza\n`ApiError{code,status,message,details}`, manda `Authorization` si hay\ntoken guardado y `X-Davinci-Source: dashboard`; helper `fileUrl(id)` que\nagrega `?key=` cuando hay token. `ui/src/sse.ts`: hook `useServerEvents`\ncon reconexión automática y un store mínimo (sin librerías) de jobs\nactivos. `JobsTray.tsx`: botón con contador de trabajos en curso y panel con\ncada trabajo (tipo, modelo, estado, error, link al asset al terminar);\nsobrevive recargas pidiendo `GET /api/jobs?status=queued,running` al\nmontar. `ApiKeyGate.tsx`: si una llamada da 401, pide la API key, la guarda\nen `localStorage` (con try/catch) y reintenta. Montar ambos en\n`Layout.tsx`/`App.tsx`.\n\nDone when: `npm run build:ui` pasa sin errores de TS y, con el servidor\ncorriendo, lanzar un job con `curl` a `POST /api/generations` hace aparecer\nel trabajo en la bandeja y pasar a \"listo\" sin recargar.",
+      "description": "`ui/src/types.ts`: tipos TS de `Generation`, `Job`, `Estimate`,\n`GenerationRequest`, `ModelInfo`, `ProviderStatus`, `SpendRow` copiados\nde *Interfaces*. `ui/src/api.ts`: una función por ruta de `/api`, que lanza\n`ApiError{code,status,message,details}`, manda `Authorization` si hay\ntoken guardado y `X-Davinci-Source: dashboard`; helper `fileUrl(id)` que\nagrega `?key=` cuando hay token. `ui/src/sse.ts`: hook `useServerEvents`\ncon reconexión automática y un store mínimo (sin librerías) de jobs\nactivos. `JobsTray.tsx`: botón con contador de trabajos en curso y panel con\ncada trabajo (tipo, modelo, estado, error, link al asset al terminar);\nsobrevive recargas pidiendo `GET /api/jobs?status=queued,running` al\nmontar. `ApiKeyGate.tsx`: si una llamada da 401, pide la API key, la guarda\nen `localStorage` (con try/catch) y reintenta. Montar ambos en\n`Layout.tsx`/`App.tsx`.\n\nDone when: `npm run build:ui` pasa sin errores de TS,\n`node src/generate.mjs serve --no-open` sirve el dashboard en `/` (recargar\nen `/spend` también funciona) y, con el servidor corriendo, lanzar un job con `curl` a `POST /api/generations` hace aparecer\nel trabajo en la bandeja y pasar a \"listo\" sin recargar.",
       "model": "claude/claude-sonnet-5",
       "reason": "Capa de datos del front sobre contrato fijo.",
       "status": "backlog",
       "dependencies": [
-        "F3.1.T1"
+        "F3.1.T1",
+        "F2.1.T3"
       ],
       "estimateHours": 3.0,
       "files": [
