@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, open, rename, stat, unlink } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -28,9 +28,40 @@ async function readManifest(path) {
   }
 }
 
+const LOCK_WAIT_MS = 10_000;
+const LOCK_STALE_MS = 30_000;
+
+async function withLock(lockPath, fn) {
+  const deadline = Date.now() + LOCK_WAIT_MS;
+  for (;;) {
+    try {
+      await (await open(lockPath, 'wx')).close();
+      break;
+    } catch (err) {
+      if (err.code !== 'EEXIST') throw err;
+      try {
+        if (Date.now() - (await stat(lockPath)).mtimeMs > LOCK_STALE_MS) {
+          await unlink(lockPath).catch(() => {});
+          continue;
+        }
+      } catch {
+        continue; // el lock desapareció entre open y stat
+      }
+      if (Date.now() > deadline) throw new Error(`manifest lock timeout: ${lockPath}`);
+      await new Promise((r) => setTimeout(r, 20 + Math.random() * 30));
+    }
+  }
+  try {
+    return await fn();
+  } finally {
+    await unlink(lockPath).catch(() => {});
+  }
+}
+
 /**
  * Registra una nueva generación en el manifest.
  * @param {object} entry
+ * @param {string} [entry.id]              - si viene, se usa en vez de generar uno
  * @param {string} entry.prompt
  * @param {string} entry.provider          - 'fal' | 'openai' | 'gemini' | 'kie' | 'heygen' | 'elevenlabs'
  * @param {string} entry.model             - modelo específico (ej: 'flux-pro-ultra')
@@ -46,8 +77,7 @@ export async function recordGeneration(entry) {
   const manifestPath = resolveManifestPath(projectRoot);
   await mkdir(dirname(manifestPath), { recursive: true });
 
-  const manifest = await readManifest(manifestPath);
-  const id = randomUUID();
+  const id = entry.id ?? randomUUID();
   const record = {
     id,
     timestamp: new Date().toISOString(),
@@ -59,8 +89,13 @@ export async function recordGeneration(entry) {
     references: entry.references ?? [],
     params: entry.params ?? {},
   };
-  manifest.generated.push(record);
-  await writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
+  await withLock(`${manifestPath}.lock`, async () => {
+    const manifest = await readManifest(manifestPath);
+    manifest.generated.push(record);
+    const tmp = `${manifestPath}.tmp-${process.pid}`;
+    await writeFile(tmp, JSON.stringify(manifest, null, 2), 'utf8');
+    await rename(tmp, manifestPath);
+  });
   return { id, manifestPath };
 }
 
