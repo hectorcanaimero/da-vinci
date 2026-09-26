@@ -85,9 +85,30 @@ Full matrix with use cases and costs: [`docs/references/model-matrix.md`](docs/r
 
 ---
 
+## Installation
+
+### Global (recommended)
+
+```bash
+npm install -g da-vinci
+davinci --help
+davinci serve                # starts dashboard + API at http://127.0.0.1:20130
+```
+
+### Local (development)
+
+```bash
+git clone https://github.com/hectorcanaimero/da-vinci.git
+cd da-vinci
+npm ci && npm run build:ui
+npm run install:setup        # interactive setup
+node src/generate.mjs --help
+npm start image --provider fal --model flux-schnell --prompt "test" --dry-run
+```
+
 ## Setup
 
-Choose ONE option:
+Choose ONE option for API keys:
 
 ### Option A — `.env` file (simplest)
 
@@ -127,8 +148,7 @@ Perfect for GitHub Actions, Docker, or scripts.
 ### Verify
 
 ```bash
-node src/generate.mjs image --provider fal --model flux-schnell \
-  --prompt "test" --dry-run --verbose
+davinci image --provider fal --model flux-schnell --prompt "test" --dry-run --verbose
 # Output: 🔑 Secretos cargados desde: dotenv (...) — keys: ...
 ```
 
@@ -189,6 +209,139 @@ node src/generate.mjs video --provider fal --model kling-2.1-master \
 ```
 
 Full command reference: `node src/generate.mjs --help`
+
+---
+
+## Dashboard (`davinci serve`)
+
+Start with `davinci serve` to open the local dashboard at `http://127.0.0.1:20130`.
+
+### Four Sections
+
+1. **Studio** — Generate new assets (image, video, SVG, 3D model, TTS, etc.). Shows cost estimates and real-time job status.
+
+2. **Library** — Browse all generations (global and project-scoped). Search by prompt, provider, model. Mark favorites, delete with optional file cleanup, inspect lineage (generations that used this asset as reference).
+
+3. **Providers** — Manage API keys. Shows connection status for each of 7 providers. Add keys directly (saved to `~/.davinci/config.json`) or use Infisical.
+
+4. **Spend** — View cost trends. Filter by date range, group by provider/model/day. See daily budget alerts and YTD total.
+
+### API Server
+
+The same server also exposes a REST API (useful for CI/CD, automation, or custom frontends). Base URL: `http://127.0.0.1:20130` (default).
+
+All routes require optional **API key** (for network exposure). Set in config:
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 20130,
+  "apiKey": "sk-...",
+  "dailyBudgetUsd": 10,
+  "concurrency": 3
+}
+```
+
+Then use `X-Davinci-API-Key` header:
+
+```bash
+curl http://<host>:20130/api/health \
+  -H "X-Davinci-API-Key: sk-..."
+```
+
+### API Routes
+
+| Method | Route | Description |
+|--------|-------|-------------|
+| GET | `/api/health` | Server status + version |
+| GET | `/api/models` | List 30+ models with costs; filter by `?kind=image` |
+| POST | `/api/estimate` | Estimate cost: `{ intent, prompt, provider, model, ... }` → `{ costUsd, level, ... }` |
+| POST | `/api/generations` | Queue generation: `{ ... }` → `{ job: { id, status, ... } }` |
+| GET | `/api/jobs` | List jobs (filter by `?status=pending`); pagination with `?limit` |
+| GET | `/api/jobs/:id` | Get single job (follow `result` field for asset ID when done) |
+| GET | `/api/library` | List all generations; filter by `?favorite=true`, project, date range |
+| GET | `/api/library/:id` | Get single asset + lineage (which generations used it as reference) |
+| PATCH | `/api/library/:id` | Update asset: `{ favorite: boolean }` |
+| DELETE | `/api/library/:id` | Delete asset; `?file=true` also deletes file |
+| GET | `/api/spend` | Cost summary; `?groupBy=day\|provider\|model`, date filters |
+| POST | `/api/import` | Import manifest: `{ path: "..." }` → `{ imported, skipped }` |
+
+### Example: OpenAI SDK Compatibility
+
+Use Da Vinci as an OpenAI-compatible endpoint:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    api_key="sk-...",           # (optional, if server has apiKey set)
+    base_url="http://127.0.0.1:20130/v1",
+)
+
+# Works like OpenAI but routes to Da Vinci (picks best model per intent)
+response = client.images.generate(
+    prompt="minimalist tooth illustration",
+    n=1,
+)
+image_url = response.data[0].url
+```
+
+Or with cURL:
+
+```bash
+curl http://127.0.0.1:20130/v1/images/generations \
+  -H "Authorization: Bearer sk-..." \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "minimalist tooth illustration",
+    "n": 1
+  }'
+```
+
+---
+
+## Global Library (`~/.davinci/`)
+
+Every generation is saved to the global library (database + files). Use via CLI or dashboard.
+
+### Directory Structure
+
+```
+~/.davinci/
+├── config.json              Your settings (port, host, apiKey, budget, etc.)
+├── orch.db                  SQLite database (generations, lineage, favorites)
+└── assets/
+    ├── <id>/
+    │   ├── artifact.{jpg,png,mp4,glb,mp3}
+    │   ├── metadata.json
+    │   └── generation.json
+    └── ...
+```
+
+### Reference Generations in Prompts
+
+Use `--refs davinci:<id>` to reference a saved generation:
+
+```bash
+davinci image --provider gemini --model nano-banana \
+  --prompt "same style but on a beach" \
+  --refs davinci:84ac4a32-5c48-4f8e-8f4c-a8f8c8f8c8f8
+```
+
+Useful for building on prior work (character consistency, style chaining, iterative refinement).
+
+---
+
+## Import Command
+
+Migrate from project-local manifests to the global library:
+
+```bash
+davinci import ./assets/generated/manifest.json
+# Output: { imported: 42, skipped: 3 }
+```
+
+Each asset is copied to `~/.davinci/assets/` with full lineage preserved.
 
 ---
 
@@ -304,7 +457,6 @@ Full guide: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - [ ] `variations` command to regenerate the last asset with new seed
 - [ ] Cloudflare Images / R2 auto-upload integration
 - [ ] Local model fallback (Ollama Vision + SD) for offline use
-- [ ] Web UI dashboard for browsing manifest
 
 ---
 
