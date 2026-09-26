@@ -50,6 +50,9 @@ const { positionals, values: flags } = parseArgs({
     style:     { type: 'string' },              // model-3d: estilo (ver docs Tripo)
     'dry-run': { type: 'boolean', default: false },
     force:     { type: 'boolean', default: false },
+    port:      { type: 'string' },              // serve
+    host:      { type: 'string' },              // serve
+    'no-open': { type: 'boolean', default: false },  // serve: no abrir el navegador
     help:      { type: 'boolean', default: false },
     verbose:   { type: 'boolean', default: false },
   },
@@ -170,7 +173,7 @@ async function runImport(path) {
 async function main() {
   // import solo toca la biblioteca local: no exige credenciales de proveedores.
   const auth = await injectSecretsIntoEnv().catch((err) => {
-    if (intent === 'import') return null;
+    if (intent === 'import' || intent === 'serve') return null;
     throw err;
   });
   if (auth && flags.verbose) {
@@ -181,6 +184,11 @@ async function main() {
     case 'list-voices':  return runListVoices();
     case 'list-avatars': return runListAvatars();
     case 'import':       return runImport(positionals[1]);
+    case 'serve': {
+      const { startServer } = await import('./server/start.mjs');
+      await startServer({ port: flags.port, host: flags.host, open: !flags['no-open'] });
+      return;
+    }
     default:
       if (KIND[intent]) return runIntent();
       console.error(`❌ Intent desconocido: ${intent}`);
@@ -242,6 +250,7 @@ Intents:
   list-voices    [--provider elevenlabs|heygen]
   list-avatars   (HeyGen)
   import         <ruta-a-manifest.json> — importa un manifest a la biblioteca → {imported, skipped}
+  serve          [--port N] [--host H] [--no-open] — dashboard + API local (Ctrl+C para cerrar)
 
 Sin --provider/--model se elige el modelo por defecto del intent (auto).
 

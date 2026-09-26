@@ -1,0 +1,54 @@
+import { existsSync } from 'node:fs';
+import { spawn } from 'node:child_process';
+import { join } from 'node:path';
+import { loadConfig } from '../core/config.mjs';
+import * as router from '../core/router.mjs';
+import { openLibrary } from '../library/db.mjs';
+import { importManifest } from '../library/import.mjs';
+import { resolveOutputDir } from '../utils/manifest.mjs';
+import { events } from './events.mjs';
+import { createJobQueue } from './jobs.mjs';
+import { createServer } from './index.mjs';
+
+const OPENERS = { linux: ['xdg-open'], darwin: ['open'], win32: ['cmd', '/c', 'start', '""'] };
+
+function openBrowser(url) {
+  const [cmd, ...args] = OPENERS[process.platform] ?? [];
+  if (!cmd) return;
+  try {
+    const p = spawn(cmd, [...args, url], { stdio: 'ignore', detached: true });
+    p.on('error', () => {}); // sin navegador/opener: no fallar
+    p.unref();
+  } catch { /* idem */ }
+}
+
+/** Arranca API + dashboard. Flags (port/host) pisan a config.json. */
+export async function startServer({ port, host, open = true, cwd = process.cwd() } = {}) {
+  const config = loadConfig();
+  if (port != null) config.port = Number(port);
+  if (host) config.host = host;
+
+  const library = openLibrary();
+  library.jobs.failInterrupted();
+  const manifest = join(cwd, 'assets', 'generated', 'manifest.json');
+  if (existsSync(manifest)) await importManifest(manifest, library).catch(() => {});
+
+  const jobs = createJobQueue({ library, router, events, concurrency: config.concurrency, outDir: resolveOutputDir(cwd) });
+  const server = createServer({ config, library, router, jobs, events });
+  await new Promise((ok, fail) => { server.once('error', fail); server.listen(config.port, config.host, ok); });
+
+  const url = `http://${config.host.includes(':') ? `[${config.host}]` : config.host}:${server.address().port}`;
+  console.log(`Da Vinci escuchando en ${url}`);
+  if (open) openBrowser(url);
+
+  let closing = false;
+  const close = async () => {
+    if (closing) return;
+    closing = true;
+    server.closeAllConnections();
+    await new Promise((r) => server.close(r));
+    library.close();
+  };
+  for (const sig of ['SIGINT', 'SIGTERM']) process.once(sig, () => close().then(() => process.exit(0)));
+  return { server, url, close };
+}
