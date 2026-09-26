@@ -50,3 +50,8 @@ desktop.ini
 # ── Logs ───────────────────────────────────────────────────────────
 *.log
 logs/
+
+# orch runtime state
+.orchestrator/state/*
+!.orchestrator/state/.gitkeep
+tasks.json.bak-*

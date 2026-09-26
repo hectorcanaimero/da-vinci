@@ -1,0 +1,563 @@
+{
+  "meta": {
+    "project": "da-vinci",
+    "generatedAt": "2026-09-25",
+    "note": "Skeleton created by `orch init`. Add tasks by editing this file directly OR by writing specs under specs/ and running `orch atomize --file specs/YOUR-SPEC.md --apply`."
+  },
+  "phases": [
+    {
+      "id": 0,
+      "name": "F0 — Foundation"
+    }
+  ],
+  "tasks": [
+    {
+      "id": "F1.1.T1",
+      "phase": 1,
+      "title": "Errores y catálogo de modelos",
+      "description": "Crear `src/core/errors.mjs` y `src/core/catalog.mjs` exactamente con las\nfirmas de *Interfaces → Núcleo (JS)* de docs/arch/001-studio.md.\n\n`errors.mjs`: clase `DavinciError` (`code`, `status`, `details`) con los\ncódigos y status HTTP listados en la arquitectura, y\n`classifyProviderError(err)` que traduce los `Error` que hoy lanzan\n`src/providers/*.mjs`: \"no configurada\" → `provider_unavailable`; `(401)`,\n`(403)`, `(429)`, `(5xx)` en el mensaje → `provider_error`; `(400)`, `(422)`\n→ `provider_rejected`; \"timeout\" o \"FAILED\"/\"failed\" de polling →\n`provider_rejected` (no se reintenta: el proveedor ya aceptó el trabajo, ver\ndecisión D9). Un `DavinciError` pasa sin cambios.\n\n`catalog.mjs`: `MODELS` con una entrada por cada modelo que hoy soporta\n`src/generate.mjs` (image por fal/openai/gemini/kie/heygen, svg recraft,\nvideo fal/gemini/kie, model-3d tripo, avatar-video heygen, audio y sfx\nelevenlabs, bg-remove, upscale clarity/real-esrgan). `costKey(params)`\nreproduce exactamente la lógica actual de `costKey()` y de cada `run*` en\n`src/generate.mjs` (quality solo para openai, `:\u003cduration\u003es` en video,\n`:textured` en tripo, `tts` vs `tts-turbo` según modelo). `equivalent` agrupa\nmodelos intercambiables entre proveedores (al menos: veo-3-fast\ngemini↔kie, veo-3 gemini↔kie, kling-2.1 fal↔kie, flux-2 kie↔fal si existe).\n`defaultModel(kind)` = defaults actuales (`flux-pro-ultra`, `kling-1.6-pro`,\n`recraft-v3-svg`, etc.). No duplicar precios: leer `COST_TABLE`.\n\nDone when: `node --test test/catalog.test.mjs` pasa y cubre: cada\n`costKey` de un modelo del catálogo existe en `COST_TABLE` (o está marcado\ncomo desconocido a propósito), `defaultModel` por cada kind, `equivalents`\nde veo-3-fast, y la clasificación de 6 mensajes de error reales copiados de\nlos providers.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Tablas y mapeo cuidadoso de lógica existente; tier estándar.",
+      "status": "backlog",
+      "dependencies": [],
+      "estimateHours": 3.0,
+      "files": [
+        "src/core/errors.mjs",
+        "src/core/catalog.mjs",
+        "test/catalog.test.mjs"
+      ],
+      "specRef": "f1-biblioteca.md#F1.1.T1",
+      "comments": []
+    },
+    {
+      "id": "F1.1.T2",
+      "phase": 1,
+      "title": "generate() y storage",
+      "description": "Mover la lógica de los handlers `runImage`, `runSvg`, `runVideo`,\n`runModel3d`, `runAvatarVideo`, `runTts`, `runSfx`, `runBgRemove`,\n`runUpscale` de `src/generate.mjs` a\n`generate(entry, req, ctx): Promise\u003cGenerationOutput[]\u003e` en\n`src/core/generate.mjs`, y los helpers `saveRemoteAsset`, `saveB64Asset`,\n`saveBufferAsset`, `downloadWithMime`, `MIME_TO_EXT`, `timestamp` a\n`src/core/storage.mjs`. Firmas y tipos en *Interfaces → Núcleo (JS)*.\n\nDiferencias con el código actual, a propósito:\n- No hay `process.exit`, ni gate de costo, ni registro: solo proveedor +\n  guardado. Errores de proveedor se relanzan con `classifyProviderError`.\n- Inputs: `req.inputs` (`{id}`, `{url}`, `{path}`) se resuelven con\n  `utils/reference-loader.mjs`; `{id}` se resuelve con una función\n  `resolveInputPath(id)` que llega en `ctx` (la inyecta el router; en tests\n  se mockea). bg-remove y upscale aceptan también inputs locales, pasando\n  data URL a FAL.\n- `n \u003e 1`: se guardan todos los archivos, `-1`, `-2`… en el nombre, y se\n  devuelven todos los outputs.\n- Directorio: `ctx.outPath` si viene (solo con un output), si no\n  `ctx.outDir`.\n\n`src/generate.mjs` NO se modifica en esta tarea (lo hace F1.4.T2).\n\nDone when: `node --test test/core.test.mjs` pasa con `fetch` mockeado y\ncubre: image fal con n=2 (dos archivos), image openai b64, video gemini con\ninput `{path}`, tts con buffer, un 401 que sale como\n`DavinciError{code:'provider_error'}`.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Refactor mecánico pero extenso; el contrato ya está fijado.",
+      "status": "backlog",
+      "dependencies": [
+        "F1.1.T1"
+      ],
+      "estimateHours": 4.0,
+      "files": [
+        "src/core/generate.mjs",
+        "src/core/storage.mjs",
+        "test/core.test.mjs"
+      ],
+      "specRef": "f1-biblioteca.md#F1.1.T2",
+      "comments": []
+    },
+    {
+      "id": "F1.2.T1",
+      "phase": 1,
+      "title": "Config y Library",
+      "description": "Crear `src/core/config.mjs`: resuelve `home` (`DAVINCI_HOME` o\n`~/.davinci`), lee `\u003chome\u003e/config.json` fusionando con los defaults de\n*Interfaces → Configuración* y exporta `loadConfig()` y `saveConfig(patch)`.\n\nCrear `src/library/db.mjs` con `openLibrary(home)` e implementar la interfaz\n`Library` completa de *Interfaces → Núcleo (JS)*, incluido `jobs`, sobre\n`node:sqlite` (`DatabaseSync`). Esquema exacto de *Data model*; migraciones\ncomo lista ordenada aplicada según `PRAGMA user_version`. Al abrir:\n`journal_mode=WAL`, `busy_timeout=5000`, `foreign_keys=ON`. Cada escritura\nes una transacción corta. `list` pagina por cursor opaco (base64 de\n`created_at|id`), `q` busca con `LIKE` sobre `prompt`, excluye borrados.\n`record` resuelve cada input con `resolveInputId` (acepta `davinci:\u003cid\u003e`,\n`/files/\u003cid\u003e`, URL absoluta que termine en `/files/\u003cid\u003e`, o ruta igual a un\n`file_path`). `remove` marca `deleted_at` y, con `deleteFile`, borra el\narchivo. `spend` agrupa por `date(created_at)`, `provider` o `model`.\n`spentToday` usa la fecha local. `jobs.failInterrupted` pasa `queued` y\n`running` a `failed` con error `{code:'interrupted'}`.\n\nSilenciar solo el `ExperimentalWarning` de `node:sqlite` si aparece.\n\nDone when: `node --test test/library.test.mjs` pasa con una home temporal y\ncubre: record + get con inputs vinculados por `davinci:\u003cid\u003e` y por ruta,\nlineage padres/hijos, list con q + kind + cursor (3 páginas), remove sin\nromper el linaje del hijo, spend por provider, jobs + failInterrupted, y dos\n`openLibrary` sobre la misma home escribiendo alternadamente.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "SQL y paginación con contrato claro; estándar alcanza.",
+      "status": "backlog",
+      "dependencies": [],
+      "estimateHours": 4.0,
+      "files": [
+        "src/core/config.mjs",
+        "src/library/db.mjs",
+        "test/library.test.mjs"
+      ],
+      "specRef": "f1-biblioteca.md#F1.2.T1",
+      "comments": []
+    },
+    {
+      "id": "F1.2.T2",
+      "phase": 1,
+      "title": "Import de manifests",
+      "description": "Crear `src/library/import.mjs` con\n`importManifest(path, lib): Promise\u003c{imported, skipped}\u003e` según *Data model →\nImport*: cada entrada se inserta con su `id` original (idempotente),\n`source='import'`, `project_dir` = carpeta dos niveles arriba del manifest,\n`kind` deducido de la extensión (`png|jpg|webp|gif`→image, `svg`→svg,\n`mp4|webm|mov`→video, `mp3|wav|m4a`→audio, `glb`→model-3d; prompt que empieza\ncon `bg-remove`/`upscale` → ese kind), `references` → inputs. Archivos que ya\nno existen se importan igual. Agregar a `Library` lo que haga falta solo como\nuso de su API pública (no editar `db.mjs`; si falta un método, usar\n`record` con el id).\n\nDone when: `node --test test/import.test.mjs` pasa: importar un manifest de\nejemplo con 4 entradas da `imported: 4`, repetir da `imported: 0,\nskipped: 4`, y un video cuya referencia es la ruta de una imagen importada\nqueda con `input_id` de esa imagen.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Transformación de datos simple.",
+      "status": "backlog",
+      "dependencies": [
+        "F1.2.T1"
+      ],
+      "estimateHours": 2.0,
+      "files": [
+        "src/library/import.mjs",
+        "test/import.test.mjs"
+      ],
+      "specRef": "f1-biblioteca.md#F1.2.T2",
+      "comments": []
+    },
+    {
+      "id": "F1.3.T1",
+      "phase": 1,
+      "title": "Lockfile y escritura atómica",
+      "description": "En `src/utils/manifest.mjs`, hacer que `recordGeneration` sea seguro entre\nprocesos: tomar `manifest.json.lock` con `open(..., 'wx')`, reintentar con\nespera corta hasta 10 s, considerar huérfano un lock de más de 30 s,\nleer-modificar-escribir a `manifest.json.tmp-\u003cpid\u003e` y `rename`, soltar el\nlock en `finally`. El formato del archivo y las firmas exportadas no\ncambian. Aceptar un `entry.id` opcional (si viene, usarlo en vez de generar\nuno), porque el router registrará el mismo id en la biblioteca y el\nmanifest.\n\nDone when: `node --test test/manifest.test.mjs` pasa: 10 procesos hijos\n(`child_process.fork`) llaman a `recordGeneration` a la vez sobre el mismo\ndirectorio y el manifest termina con 10 entradas y JSON válido; un\n`entry.id` dado se respeta.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Concurrencia de archivos acotada.",
+      "status": "backlog",
+      "dependencies": [],
+      "estimateHours": 2.0,
+      "files": [
+        "src/utils/manifest.mjs",
+        "test/manifest.test.mjs"
+      ],
+      "specRef": "f1-biblioteca.md#F1.3.T1",
+      "comments": []
+    },
+    {
+      "id": "F1.4.T1",
+      "phase": 1,
+      "title": "core/router",
+      "description": "Crear `src/core/router.mjs` con `estimate(req)` y `run(req, ctx)` según\n*Interfaces → Núcleo (JS)* y *Components → core/router*:\n\n1. Resolver el modelo: `auto`/vacío → `defaultModel(kind)`; id desconocido →\n   `invalid_request`. Validar campos requeridos por kind (prompt, text,\n   script+avatar+voice…) → `invalid_request`.\n2. Candidatos: el pedido + `equivalents(id)` si `req.fallback !== false` y\n   `config.fallback`.\n3. Gate: `estimateCost` con los umbrales de config; `confirm` sin\n   `req.confirm` → `cost_confirm_required` (details con costo). Si\n   `dailyBudgetUsd` y `spentToday()+costo` lo supera → `budget_exceeded`\n   (no lo salta `confirm`).\n4. Ejecutar `generate()` por candidato; ante `provider_unavailable` o\n   `provider_error` pasar al siguiente; ante cualquier otro error, lanzar.\n   Si todos fallan, lanzar el último error.\n5. Registrar cada output en la biblioteca (`record`, con `requested_model`\n   si hubo fallback, `source`, `project_dir`, `params`, inputs) y, si\n   `ctx.projectDir`, también en su `manifest.json` con el mismo id.\n6. Devolver `Generation[]`.\n\nLa biblioteca y config se obtienen por defecto con `openLibrary()` /\n`loadConfig()`, pero `run`/`estimate` aceptan `ctx.library` para tests.\n`ctx.resolveInputPath` para `generate` se construye con `library.get`.\n\nDone when: `node --test test/router.test.mjs` pasa con `generate` y\nbiblioteca reales sobre home temporal y `fetch` mockeado: auto elige el\ndefault, costo alto sin confirm lanza 402, tope diario lanza\n`budget_exceeded`, un 401 de gemini hace fallback a kie y registra\n`provider: 'kie'` + `requested_model`, un 422 no hace fallback, y con\n`projectDir` el manifest y la biblioteca comparten id.",
+      "model": "claude/opus",
+      "reason": "Punto central de gasto y fallback; errores aquí cuestan dinero real.",
+      "status": "backlog",
+      "dependencies": [
+        "F1.1.T2",
+        "F1.2.T1",
+        "F1.3.T1"
+      ],
+      "estimateHours": 4.0,
+      "files": [
+        "src/core/router.mjs",
+        "test/router.test.mjs"
+      ],
+      "specRef": "f1-biblioteca.md#F1.4.T1",
+      "comments": []
+    },
+    {
+      "id": "F1.4.T2",
+      "phase": 1,
+      "title": "CLI como capa fina",
+      "description": "Reescribir `src/generate.mjs` para que use `core/router`: flags →\n`GenerationRequest` (`--provider X --model Y` → `model: 'X/Y'`; solo\n`--provider` → default de ese proveedor; nada → `auto`), `ctx = { source:\n'cli', projectDir: cwd, outDir: \u003ccwd\u003e/assets/generated, outPath: --out }`.\nConservar exactamente: todos los flags, `--help`, `--dry-run` (imprime el\nmismo JSON de hoy usando `estimate`), el mensaje de costo por stderr,\n`--force` → `confirm: true`, código de salida 2 en\n`cost_confirm_required`, `list-voices` y `list-avatars`, y el JSON de éxito\n(`ok, id, provider, model, outputPath, costUsd, manifestPath`; con n\u003e1,\nimprimir uno por output). `--refs` acepta además `davinci:\u003cid\u003e`.\nNuevo subcomando `import \u003cruta-a-manifest.json\u003e` que usa `importManifest` e\nimprime `{imported, skipped}`. `--help` los documenta.\n\nEn `package.json`: `engines.node` → `\u003e=22.13.0`, script `\"test\": \"node\n--test test/\"`, y `lint` incluye `src/core/*.mjs src/library/*.mjs`.\n\nDone when: `npm test` pasa entero, e incluye `test/cli.test.mjs` que corre\nel CLI como proceso hijo con un `--import` de un módulo que mockea `fetch`\ny `DAVINCI_HOME` temporal: `image --dry-run`, `image` fal (JSON de salida\ncon el mismo shape y fila en la biblioteca), costo alto sin `--force` → exit\n2, `--refs davinci:\u003cid\u003e` vincula el padre, `import` dos veces es idempotente.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Cableado con compatibilidad estricta; el diseño ya está resuelto.",
+      "status": "backlog",
+      "dependencies": [
+        "F1.4.T1",
+        "F1.2.T2"
+      ],
+      "estimateHours": 3.0,
+      "files": [
+        "src/generate.mjs",
+        "package.json",
+        "test/cli.test.mjs",
+        "test/helpers/mock-fetch.mjs"
+      ],
+      "specRef": "f1-biblioteca.md#F1.4.T2",
+      "comments": []
+    },
+    {
+      "id": "F2.1.T1",
+      "phase": 2,
+      "title": "Servidor HTTP base",
+      "description": "Crear el esqueleto del servidor:\n\n- `src/server/http.mjs`: tabla de rutas mínima (`method`, patrón con\n  `:params`), parseo de query y body JSON (límite 25 MB), `sendJson`,\n  `sendError(DavinciError)` con el formato\n  `{error:{code,message,details}}`, 404 JSON para rutas `/api` y `/v1`\n  desconocidas.\n- Auth: si `config.host` no es `127.0.0.1`/`localhost`/`::1`, exigir\n  `Authorization: Bearer \u003cconfig.apiKey\u003e` en `/api/*`, `/v1/*` y\n  `/files/*` (también `?key=` en `/files` y `/api/events`, porque `\u003cimg\u003e` y\n  `EventSource` no mandan headers); sin `apiKey` configurada en ese caso,\n  negarse a arrancar con un mensaje claro.\n- `src/server/events.mjs`: `EventEmitter` compartido y handler de\n  `GET /api/events` (SSE: `event: \u003ctipo\u003e\\ndata: \u003cjson\u003e\\n\\n`, ping cada 25 s,\n  limpieza al cerrar).\n- `src/server/routes/files.mjs`: `GET /files/:id` sirve solo el\n  `file_path` de esa fila (404 si no existe o está borrada), con\n  `Content-Type`, `Content-Length` y soporte de `Range` (206).\n- `src/server/routes/openai.mjs` y `src/server/routes/providers.mjs`: stubs\n  que exportan `routes = []` (los llenan F2.3.T1 y F2.4.T2).\n- `src/server/index.mjs`: `createServer({ config, library, router, jobs })`\n  → `http.Server`, que monta `routes/*.mjs`, `/api/events` y sirve estáticos\n  de `dist/ui` (si no existe, `/` responde una página HTML mínima que dice\n  que el dashboard no está compilado) con fallback a `index.html` para rutas\n  que no empiezan con `/api`, `/v1` o `/files`. Evitar path traversal en\n  estáticos.\n- `src/server/routes/api.mjs`: stub con `routes = []` y solo\n  `GET /api/health` → `{ok, version}` (lo completa F2.1.T2).\n\nDone when: `node --test test/server.test.mjs` pasa: health responde, ruta\n`/api/x` da 404 JSON, `/files/:id` sirve un archivo registrado con y sin\n`Range`, `/files/\u003cid-borrado\u003e` da 404, un pedido a `/../package.json` no\nescapa de `dist/ui`, con host `0.0.0.0` sin token da 401 y con token 200, y\nun evento emitido llega por SSE.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "HTTP a mano con auth y traversal; estándar con buenos tests.",
+      "status": "backlog",
+      "dependencies": [
+        "F1.4.T2"
+      ],
+      "estimateHours": 4.0,
+      "files": [
+        "src/server/http.mjs",
+        "src/server/events.mjs",
+        "src/server/index.mjs",
+        "src/server/routes/files.mjs",
+        "src/server/routes/api.mjs",
+        "src/server/routes/openai.mjs",
+        "src/server/routes/providers.mjs",
+        "test/server.test.mjs"
+      ],
+      "specRef": "f2-servidor-api.md#F2.1.T1",
+      "comments": []
+    },
+    {
+      "id": "F2.1.T2",
+      "phase": 2,
+      "title": "API nativa",
+      "description": "Completar `src/server/routes/api.mjs` con todas las rutas `/api/*` de la\ntabla *Interfaces → HTTP* salvo `/api/providers*` y `/api/events`:\n`models` (con `available` según haya key del proveedor en `process.env`),\n`estimate`, `generations` (valida y corre `router.estimate` antes de\nencolar, así los 402 y 400 salen sincrónicos; luego `jobs.enqueue(req,\n'dashboard'|'api')` según header `X-Davinci-Source`, 202 `{job}`), `jobs`,\n`jobs/:id`, `library` (query → filtro de `Library.list`), `library/:id` (con\n`parents`/`children`), `PATCH` favorito, `DELETE` (con `?file=true`, emite\n`generation.deleted`), `projects`, `spend` (con `totalUsd`), `import`.\nToda `Generation` serializada con `url: '/files/\u003cid\u003e'`.\n\nDone when: `node --test test/api.test.mjs` pasa cubriendo cada ruta al menos\nuna vez, incluyendo: POST generations con costo alto sin confirm → 402 sin\njob creado, POST válido → 202 y luego el job termina `done` con la\ngeneración en `GET /api/library`.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Muchas rutas finas sobre contratos ya definidos.",
+      "status": "backlog",
+      "dependencies": [
+        "F2.1.T1",
+        "F2.2.T1"
+      ],
+      "estimateHours": 4.0,
+      "files": [
+        "src/server/routes/api.mjs",
+        "test/api.test.mjs"
+      ],
+      "specRef": "f2-servidor-api.md#F2.1.T2",
+      "comments": []
+    },
+    {
+      "id": "F2.1.T3",
+      "phase": 2,
+      "title": "Subcomando serve y arranque",
+      "description": "Crear `src/server/start.mjs` con `startServer({ port, host, open, cwd })`:\ncarga config (flags pisan config), abre la biblioteca, `jobs.failInterrupted()`,\nimporta `\u003ccwd\u003e/assets/generated/manifest.json` si existe (silencioso si no),\ncrea la cola y el servidor, escucha, imprime la URL y, salvo `open: false`,\nabre el navegador (`xdg-open`/`open`/`start` según plataforma, sin fallar si\nno hay). Cierra limpio con SIGINT/SIGTERM.\n\nEn `src/generate.mjs`, agregar `serve [--port N] [--host H] [--no-open]`\nque llama a `startServer`, y documentarlo en `--help`.\n\nDone when: `node src/generate.mjs serve --port 0 --no-open` arranca, imprime\nla URL, `GET /api/health` responde, y un job dejado en `running` en la base\naparece como `failed`/`interrupted` tras arrancar (test en\n`test/start.test.mjs` con proceso hijo).",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Cableado de arranque.",
+      "status": "backlog",
+      "dependencies": [
+        "F2.1.T2"
+      ],
+      "estimateHours": 2.0,
+      "files": [
+        "src/server/start.mjs",
+        "src/generate.mjs",
+        "test/start.test.mjs"
+      ],
+      "specRef": "f2-servidor-api.md#F2.1.T3",
+      "comments": []
+    },
+    {
+      "id": "F2.2.T1",
+      "phase": 2,
+      "title": "Cola en proceso con persistencia",
+      "description": "Crear `src/server/jobs.mjs` con\n`createJobQueue({ library, router, events, concurrency, outDir })` →\n`{ enqueue(req, source): Job, get(id), list(filter), idle(): Promise }`.\n`enqueue` crea el job `queued` en `library.jobs`, emite `job`, y lo corre\ncuando haya lugar (máximo `concurrency` a la vez, FIFO). Correr = pasar a\n`running` (emite), `router.run(req, { source, outDir, library })`, y al\nterminar `done` con `generationIds` (emite `job` y una `generation` por\nresultado) o `failed` con `{code, message}` (emite `job`). Un error nunca\ntumba la cola. `events` es un `EventEmitter` inyectado; no importar\n`src/server/events.mjs`. `idle()` resuelve cuando no hay nada en cola ni\ncorriendo (para tests).\n\nDone when: `node --test test/jobs.test.mjs` pasa con un `router` falso:\nconcurrencia 2 con 5 jobs nunca corre más de 2 a la vez, un job que lanza\nqueda `failed` y los siguientes corren, los eventos llegan en orden\n`queued→running→done` y el estado queda persistido en la biblioteca.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Concurrencia simple con contrato cerrado.",
+      "status": "backlog",
+      "dependencies": [
+        "F1.4.T1"
+      ],
+      "estimateHours": 3.0,
+      "files": [
+        "src/server/jobs.mjs",
+        "test/jobs.test.mjs"
+      ],
+      "specRef": "f2-servidor-api.md#F2.2.T1",
+      "comments": []
+    },
+    {
+      "id": "F2.3.T1",
+      "phase": 2,
+      "title": "/v1/models y /v1/images/generations",
+      "description": "Llenar `src/server/routes/openai.mjs` según *Interfaces → HTTP* (filas\n`/v1`): `GET /v1/models` lista los modelos del catálogo de kind `image` y\n`svg` en formato OpenAI. `POST /v1/images/generations` recibe\n`{model, prompt, n, size, response_format}`, traduce `size`→`aspect`,\n`X-Davinci-Confirm: true`→`confirm`, encola con source `api`, espera a que\nel job termine (sin timeout propio) y responde\n`{created, data:[{url}]}` con URL absoluta según el header `Host`, o\n`b64_json` si se pidió. Errores en formato OpenAI:\n`{error:{message, type, code}}` con el mismo status.\n\nDone when: `node --test test/openai.test.mjs` pasa usando el SDK HTTP a mano\n(fetch) con la forma exacta del SDK de OpenAI: genera con\n`fal/flux-schnell` y la URL devuelta descarga el archivo; `b64_json`\nfunciona; modelo desconocido → 400 formato OpenAI; costo alto sin header →\n402.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Adaptador de formato sobre piezas existentes.",
+      "status": "backlog",
+      "dependencies": [
+        "F2.1.T2"
+      ],
+      "estimateHours": 3.0,
+      "files": [
+        "src/server/routes/openai.mjs",
+        "test/openai.test.mjs"
+      ],
+      "specRef": "f2-servidor-api.md#F2.3.T1",
+      "comments": []
+    },
+    {
+      "id": "F2.4.T1",
+      "phase": 2,
+      "title": "Estado y keys de proveedores",
+      "description": "Crear `src/core/providers-status.mjs`: por cada proveedor (openai, gemini,\nfal, kie, heygen, elevenlabs, tripo) → `{ id, status, source, keyHint,\nerror? }`. `source` sale de dónde cargó la key `utils/secrets.mjs` (env,\n`dotenv:\u003cruta\u003e`, `infisical`); si hace falta, extender `secrets.mjs` para\nque reporte el origen por key sin cambiar su API actual. `keyHint` =\n`…` + últimos 4 caracteres; la key completa nunca sale de este módulo.\n`testProvider(id)`: llamada barata real (openai `GET /v1/models`, gemini\nlistar modelos, fal un `GET` autenticado a la cola, kie consulta de\ncréditos, heygen `listVoices`, elevenlabs `listVoices`, tripo\n`getBalance`) → `connected` o `error` con mensaje. `saveKey(id, key)`:\nescribir/reemplazar la línea en `~/.config/da-vinci/.env` (crear con modo\n`600`, conservar otras líneas), actualizar `process.env` y devolver el estado\ntras `testProvider`.\n\nDone when: `node --test test/providers.test.mjs` pasa con `HOME` temporal y\n`fetch` mockeado: sin key → `missing`, `saveKey` crea el archivo con modo\n600 y no pisa otras keys, `keyHint` nunca contiene la key completa, un 401\nen el test → `error`.",
+      "model": "claude/opus",
+      "reason": "Maneja secretos y permisos de archivo; vale el tier premium.",
+      "status": "backlog",
+      "dependencies": [],
+      "estimateHours": 3.0,
+      "files": [
+        "src/core/providers-status.mjs",
+        "src/utils/secrets.mjs",
+        "test/providers.test.mjs"
+      ],
+      "specRef": "f2-servidor-api.md#F2.4.T1",
+      "comments": []
+    },
+    {
+      "id": "F2.4.T2",
+      "phase": 2,
+      "title": "Rutas /api/providers",
+      "description": "Llenar `src/server/routes/providers.mjs`: `GET /api/providers`,\n`PUT /api/providers/:id/key` (`{key}` no vacío, si no 400),\n`POST /api/providers/:id/test`, usando `providers-status.mjs`. Proveedor\ndesconocido → 404.\n\nDone when: `node --test test/providers-routes.test.mjs` pasa cubriendo las\ntres rutas y verificando que ninguna respuesta contiene la key completa.",
+      "model": "claude/claude-haiku-4-5",
+      "reason": "Tres rutas finas sobre un módulo ya probado.",
+      "status": "backlog",
+      "dependencies": [
+        "F2.4.T1",
+        "F2.1.T1"
+      ],
+      "estimateHours": 1.0,
+      "files": [
+        "src/server/routes/providers.mjs",
+        "test/providers-routes.test.mjs"
+      ],
+      "specRef": "f2-servidor-api.md#F2.4.T2",
+      "comments": []
+    },
+    {
+      "id": "F2.5.T1",
+      "phase": 2,
+      "title": "Smoke test del servidor",
+      "description": "Crear `test/e2e.test.mjs`: arranca `startServer` en puerto 0 con\n`DAVINCI_HOME` temporal y `fetch` de proveedores mockeado; genera una imagen\npor `POST /api/generations`, espera el evento `job` `done` por SSE, genera\nun video con `inputs:[{id}]` de esa imagen, verifica el linaje en\n`GET /api/library/:id`, genera por `/v1/images/generations`, y comprueba\n`GET /api/spend` suma los tres costos. Además corre el CLI contra la misma\n`DAVINCI_HOME` y verifica que su generación aparece en `GET /api/library`.\n\nDone when: `npm test` pasa entero incluyendo `test/e2e.test.mjs`.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Test de integración sobre piezas terminadas.",
+      "status": "backlog",
+      "dependencies": [
+        "F2.1.T3",
+        "F2.3.T1",
+        "F2.4.T2"
+      ],
+      "estimateHours": 2.0,
+      "files": [
+        "test/e2e.test.mjs"
+      ],
+      "specRef": "f2-servidor-api.md#F2.5.T1",
+      "comments": []
+    },
+    {
+      "id": "F3.1.T1",
+      "phase": 3,
+      "title": "Proyecto Vite y build",
+      "description": "Crear el proyecto en `ui/` (Vite, React, TypeScript estricto,\n`react-router-dom`). `vite build` escribe en `../dist/ui` con `base: '/'`;\nen dev, proxy de `/api`, `/v1` y `/files` a `http://127.0.0.1:20130`.\n`App.tsx` registra todas las rutas del SPA apuntando a páginas stub\n(`ui/src/pages/{Library,Asset,Studio,Providers,Spend}/index.tsx`, cada una\ncon un título), `Layout.tsx` con navegación lateral (colapsa a barra\ninferior en móvil) y un stub `ui/src/components/JobsTray.tsx`. `styles.css`\ncon los tokens de color, tipografía y espaciado.\n\nEn el `package.json` raíz: scripts `build:ui` (`npm --prefix ui ci \u0026\u0026 npm\n--prefix ui run build`) y `prepublishOnly` (`npm run build:ui \u0026\u0026 npm test`),\n`files` con `src/`, `dist/ui/`, `SKILL.md`, `install.mjs`, `README*.md`,\n`LICENSE`, `.env.example`, `docs/references/`. En `.gitignore`: `dist/` y\n`ui/node_modules/`.\n\nDone when: `npm run build:ui` termina sin errores ni warnings de TS,\n`node src/generate.mjs serve --no-open` sirve el dashboard en `/`, las 5\nrutas navegan (incluido recargar en `/spend`), y `npm pack --dry-run` lista\n`dist/ui/index.html` y no lista `ui/`.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Scaffolding de front estándar.",
+      "status": "backlog",
+      "dependencies": [
+        "F2.1.T3"
+      ],
+      "estimateHours": 3.0,
+      "files": [
+        "ui/package.json",
+        "ui/package-lock.json",
+        "ui/tsconfig.json",
+        "ui/vite.config.ts",
+        "ui/index.html",
+        "ui/src/main.tsx",
+        "ui/src/App.tsx",
+        "ui/src/styles.css",
+        "ui/src/components/Layout.tsx",
+        "ui/src/components/JobsTray.tsx",
+        "ui/src/pages/Library/index.tsx",
+        "ui/src/pages/Asset/index.tsx",
+        "ui/src/pages/Studio/index.tsx",
+        "ui/src/pages/Providers/index.tsx",
+        "ui/src/pages/Spend/index.tsx",
+        "package.json",
+        ".gitignore"
+      ],
+      "specRef": "f3-library-ui.md#F3.1.T1",
+      "comments": []
+    },
+    {
+      "id": "F3.1.T2",
+      "phase": 3,
+      "title": "Cliente de API, SSE y bandeja de trabajos",
+      "description": "`ui/src/types.ts`: tipos TS de `Generation`, `Job`, `Estimate`,\n`GenerationRequest`, `ModelInfo`, `ProviderStatus`, `SpendRow` copiados\nde *Interfaces*. `ui/src/api.ts`: una función por ruta de `/api`, que lanza\n`ApiError{code,status,message,details}`, manda `Authorization` si hay\ntoken guardado y `X-Davinci-Source: dashboard`; helper `fileUrl(id)` que\nagrega `?key=` cuando hay token. `ui/src/sse.ts`: hook `useServerEvents`\ncon reconexión automática y un store mínimo (sin librerías) de jobs\nactivos. `JobsTray.tsx`: botón con contador de trabajos en curso y panel con\ncada trabajo (tipo, modelo, estado, error, link al asset al terminar);\nsobrevive recargas pidiendo `GET /api/jobs?status=queued,running` al\nmontar. `ApiKeyGate.tsx`: si una llamada da 401, pide la API key, la guarda\nen `localStorage` (con try/catch) y reintenta. Montar ambos en\n`Layout.tsx`/`App.tsx`.\n\nDone when: `npm run build:ui` pasa sin errores de TS y, con el servidor\ncorriendo, lanzar un job con `curl` a `POST /api/generations` hace aparecer\nel trabajo en la bandeja y pasar a \"listo\" sin recargar.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Capa de datos del front sobre contrato fijo.",
+      "status": "backlog",
+      "dependencies": [
+        "F3.1.T1"
+      ],
+      "estimateHours": 3.0,
+      "files": [
+        "ui/src/types.ts",
+        "ui/src/api.ts",
+        "ui/src/sse.ts",
+        "ui/src/components/JobsTray.tsx",
+        "ui/src/components/ApiKeyGate.tsx",
+        "ui/src/components/Layout.tsx",
+        "ui/src/App.tsx"
+      ],
+      "specRef": "f3-library-ui.md#F3.1.T2",
+      "comments": []
+    },
+    {
+      "id": "F3.2.T1",
+      "phase": 3,
+      "title": "Grilla, búsqueda y filtros",
+      "description": "Página Library en `ui/src/pages/Library/`: grilla responsive de tarjetas\n(miniatura con `loading=\"lazy\"`; video con `preload=\"metadata\"` y play al\nhover; audio/sfx con ícono y reproductor al abrir; GLB y SVG con ícono o\n`\u003cimg\u003e`), en cada tarjeta prompt truncado, modelo, costo estimado, fecha\nrelativa y estrella de favorito (`PATCH`). Barra con búsqueda (debounce\n250 ms), filtros por tipo, proveedor, modelo (de `GET /api/models`),\nproyecto (de `GET /api/projects`), rango de fechas y solo favoritos; el\nestado de filtros vive en la query string. Scroll infinito con\n`nextCursor`. Se agregan arriba las generaciones nuevas que llegan por SSE\nsi coinciden con los filtros, y desaparecen las borradas. Clic en tarjeta →\n`/asset/:id`. Estados vacío, cargando y error.\n\nDone when: `npm run build:ui` pasa, y con una biblioteca de prueba de 5 000\nfilas (script `ui/scripts/seed.mjs` que las inserta en una\n`DAVINCI_HOME` dada usando `openLibrary`) la primera página aparece en \u003c 1 s\ny buscar por texto filtra correctamente.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "UI de lista con estado; estándar.",
+      "status": "backlog",
+      "dependencies": [
+        "F3.1.T2"
+      ],
+      "estimateHours": 4.0,
+      "files": [
+        "ui/src/pages/Library/",
+        "ui/scripts/seed.mjs"
+      ],
+      "specRef": "f3-library-ui.md#F3.2.T1",
+      "comments": []
+    },
+    {
+      "id": "F3.3.T1",
+      "phase": 3,
+      "title": "Visores por tipo de asset",
+      "description": "Componentes en `ui/src/components/viewers/`: `ImageViewer` (zoom al clic),\n`SvgViewer` (como `\u003cimg\u003e`, fondo a cuadros), `VideoViewer` (`\u003cvideo\ncontrols\u003e`), `AudioViewer` (`\u003caudio controls\u003e`), `ModelViewer` (GLB con\n`@google/model-viewer`, importado de forma diferida solo cuando se usa), y\n`AssetViewer` que elige por `kind`/`mime`. Todos reciben\n`Generation` y usan `fileUrl(id)`. Agregar `@google/model-viewer` a\n`ui/package.json`.\n\nDone when: `npm run build:ui` pasa, el chunk principal no incluye\nmodel-viewer (verificar en el output de build), y cada visor se ve con un\narchivo de ejemplo de `docs/examples/`.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Componentes de presentación simples.",
+      "status": "backlog",
+      "dependencies": [
+        "F3.1.T2"
+      ],
+      "estimateHours": 2.0,
+      "files": [
+        "ui/src/components/viewers/",
+        "ui/package.json",
+        "ui/package-lock.json"
+      ],
+      "specRef": "f3-library-ui.md#F3.3.T1",
+      "comments": []
+    },
+    {
+      "id": "F3.3.T2",
+      "phase": 3,
+      "title": "Página de detalle con linaje",
+      "description": "Página `ui/src/pages/Asset/index.tsx` (y componentes en esa carpeta): visor\ngrande con `AssetViewer`, prompt completo con botón copiar, modelo (y \"pedido:\nX\" si `requestedModel` difiere), parámetros, costo estimado, fecha, origen,\nproyecto, ruta del archivo con copiar, descargar. Linaje: padres e hijos\ncomo miniaturas navegables; un padre borrado o externo (`input_ref` sin id)\nse muestra como tal. Favorito y borrar (diálogo con opción \"borrar también el\narchivo\"; tras borrar vuelve a Library). Dejar un contenedor\n`\u003cdiv data-slot=\"actions\"\u003e` donde F4.2.T1 montará las acciones. Reacciona a\n`generation` por SSE agregando hijos nuevos.\n\nDone when: `npm run build:ui` pasa y, con el servidor y datos de prueba, se\nnavega de un GLB a la imagen origen y de ahí a su otro hijo; borrar un\npadre deja al hijo mostrando \"origen borrado\".",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Página de detalle con navegación; estándar.",
+      "status": "backlog",
+      "dependencies": [
+        "F3.3.T1"
+      ],
+      "estimateHours": 3.0,
+      "files": [
+        "ui/src/pages/Asset/"
+      ],
+      "specRef": "f3-library-ui.md#F3.3.T2",
+      "comments": []
+    },
+    {
+      "id": "F4.1.T1",
+      "phase": 4,
+      "title": "Formulario de generación con costo",
+      "description": "Página `ui/src/pages/Studio/`: selector de tipo (image, svg, video,\nmodel-3d, audio, sfx, avatar-video, bg-remove, upscale); por tipo, solo los\ncampos que aplican (prompt/text/script, aspecto, duración, calidad, n,\nvoz — de `/api/...` si existe o campo libre —, textura/PBR, estilo, motor de\nupscale); selector de modelo con \"Auto\" primero y los de `GET\n/api/models?kind=` (deshabilitados si `available: false`, con aviso \"sin\nkey\" y link a `/providers`). Estimación en vivo con `POST /api/estimate`\n(debounce 400 ms): costo, nivel y candidatos de fallback. Enviar: si el\nnivel es `confirm`, diálogo de confirmación que reenvía con `confirm: true`;\n`budget_exceeded` se muestra con el tope. Tras enviar, el trabajo aparece en\nla bandeja y el formulario queda listo para otra generación. Cuando el job\ntermina, mostrar el resultado debajo con link al detalle.\n\nDone when: `npm run build:ui` pasa y, con el servidor y proveedores\nmockeados o reales, se genera una imagen con modelo Auto, el costo mostrado\nantes de enviar es igual al de `davinci image --dry-run` con los mismos\nparámetros, y un video de costo alto pide confirmación.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Formulario dinámico con varios estados; estándar.",
+      "status": "backlog",
+      "dependencies": [
+        "F3.1.T2"
+      ],
+      "estimateHours": 4.0,
+      "files": [
+        "ui/src/pages/Studio/"
+      ],
+      "specRef": "f4-studio.md#F4.1.T1",
+      "comments": []
+    },
+    {
+      "id": "F4.1.T2",
+      "phase": 4,
+      "title": "Inputs desde la biblioteca y precarga",
+      "description": "`ui/src/components/AssetPicker.tsx`: diálogo que reutiliza la API de\n`/api/library` (búsqueda + filtro por tipo) para elegir uno o varios assets,\ny también acepta una URL. Integrarlo en Studio para los tipos que aceptan\ninputs (`acceptsInputs` del modelo): mostrar los elegidos como miniaturas\nquitables y enviarlos como `inputs:[{id}|{url}]`. Studio lee la query\n`kind`, `model`, `input` (repetible) y `prompt` al montar y se precarga.\n\nDone when: `npm run build:ui` pasa y abrir\n`/studio?kind=video\u0026input=\u003cid-de-imagen\u003e\u0026prompt=hola` muestra el formulario\nde video con la imagen elegida y el prompt; generar deja el video como hijo\nde la imagen en su detalle.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Componente de selección más cableado de query.",
+      "status": "backlog",
+      "dependencies": [
+        "F4.1.T1"
+      ],
+      "estimateHours": 3.0,
+      "files": [
+        "ui/src/components/AssetPicker.tsx",
+        "ui/src/pages/Studio/"
+      ],
+      "specRef": "f4-studio.md#F4.1.T2",
+      "comments": []
+    },
+    {
+      "id": "F4.2.T1",
+      "phase": 4,
+      "title": "Acciones desde el detalle",
+      "description": "`ui/src/pages/Asset/Actions.tsx`, montado en el `data-slot=\"actions\"` del\ndetalle: Regenerar (mismo pedido: `kind`, `model`, `prompt`, params e\ninputs, directo a `POST /api/generations` con confirmación si hace falta),\nVariar prompt (abre Studio precargado), y según el tipo del asset: imagen →\n\"Animar (video)\", \"Modelo 3D\", \"Quitar fondo\", \"Upscale\"; SVG → \"Rasterizar\na imagen\" solo si algún modelo lo soporta, si no, ocultar; video, audio y 3D\nsolo Regenerar/Variar. Cada acción de encadenamiento es un link a\n`/studio?kind=…\u0026input=\u003cid\u003e`.\n\nDone when: `npm run build:ui` pasa y desde el detalle de una imagen, \"Animar\n(video)\" abre Studio con la imagen cargada y \"Regenerar\" crea un nuevo job\ncon el mismo prompt y modelo.",
+      "model": "claude/claude-haiku-4-5",
+      "reason": "Botones y links sobre piezas existentes.",
+      "status": "backlog",
+      "dependencies": [
+        "F3.3.T2"
+      ],
+      "estimateHours": 2.0,
+      "files": [
+        "ui/src/pages/Asset/Actions.tsx",
+        "ui/src/pages/Asset/index.tsx"
+      ],
+      "specRef": "f4-studio.md#F4.2.T1",
+      "comments": []
+    },
+    {
+      "id": "F5.1.T1",
+      "phase": 5,
+      "title": "Pantalla Providers",
+      "description": "`ui/src/pages/Providers/`: una tarjeta por proveedor con estado\n(conectado / sin key / error, con el mensaje), origen de la key, `keyHint`,\nqué tipos cubre (de `/api/models`), botón \"Probar conexión\" y formulario\n\"Pegar key\" (input `type=\"password\"`, `autocomplete=\"off\"`, se limpia tras\nguardar). Aviso fijo de dónde se guardan las keys\n(`~/.config/da-vinci/.env`) y de que Infisical, si está configurado, tiene\nprioridad.\n\nDone when: `npm run build:ui` pasa y, con el servidor, pegar una key de\nprueba cambia el estado sin recargar y la key no aparece en ninguna\nrespuesta de red (revisar con DevTools o `curl`).",
+      "model": "claude/claude-haiku-4-5",
+      "reason": "Pantalla simple sobre rutas ya probadas.",
+      "status": "backlog",
+      "dependencies": [
+        "F3.1.T2",
+        "F2.4.T2"
+      ],
+      "estimateHours": 2.0,
+      "files": [
+        "ui/src/pages/Providers/"
+      ],
+      "specRef": "f5-providers-spend.md#F5.1.T1",
+      "comments": []
+    },
+    {
+      "id": "F5.2.T1",
+      "phase": 5,
+      "title": "Pantalla Spend",
+      "description": "`ui/src/pages/Spend/`: selector de rango (7 d, 30 d, mes actual, custom),\ntotal del rango y del mes actual, barras por día en SVG propio (sin librería\nde gráficos; tooltip con valor, eje con montos, accesible con `\u003ctitle\u003e` y\ntabla alternativa), tablas por proveedor y por modelo con conteo y costo,\ntodo desde `GET /api/spend`. Muestra el tope diario de config si existe y\ncuánto queda hoy. Etiqueta visible: \"costos estimados según tabla de\nprecios\".\n\nDone when: `npm run build:ui` pasa y con datos de prueba el total del rango\ncoincide con la suma de costos de `GET /api/library` en ese rango.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Gráfico SVG a mano con accesibilidad; estándar.",
+      "status": "backlog",
+      "dependencies": [
+        "F3.1.T2"
+      ],
+      "estimateHours": 3.0,
+      "files": [
+        "ui/src/pages/Spend/"
+      ],
+      "specRef": "f5-providers-spend.md#F5.2.T1",
+      "comments": []
+    },
+    {
+      "id": "F5.3.T1",
+      "phase": 5,
+      "title": "README, SKILL y CHANGELOG",
+      "description": "Actualizar `README.md` con: instalación `npm i -g da-vinci` + `davinci\nserve`, capturas o GIF (dejar placeholders con nombre de archivo en\n`docs/examples/` si no hay capturas), las 4 secciones del dashboard, la API\n(tabla de rutas nativas y ejemplo con el SDK de OpenAI apuntando a\n`http://127.0.0.1:20130/v1`), `config.json`, la biblioteca en `~/.davinci/`,\nel subcomando `import`, exponer en la red con `apiKey`, y quitar \"Web UI\ndashboard\" del roadmap. En `SKILL.md` (y copiar idéntico a\n`docs/SKILL.md`): que toda generación queda también en la biblioteca global\ny que `--refs davinci:\u003cid\u003e` encadena desde ella. En `CHANGELOG.md`, versión\n`2.0.0` con los cambios y el breaking change de Node ≥ 22.13. Subir\n`version` en `package.json` a `2.0.0`.\n\nDone when: todos los comandos del README corren tal cual (probar los que no\ngastan: `--help`, `--dry-run`, `serve --no-open`, `import`), y\n`SKILL.md` y `docs/SKILL.md` son idénticos.",
+      "model": "claude/claude-haiku-4-5",
+      "reason": "Documentación.",
+      "status": "backlog",
+      "dependencies": [
+        "F4.1.T2",
+        "F4.2.T1",
+        "F5.1.T1",
+        "F5.2.T1",
+        "F2.5.T1"
+      ],
+      "estimateHours": 3.0,
+      "files": [
+        "README.md",
+        "SKILL.md",
+        "docs/SKILL.md",
+        "CHANGELOG.md",
+        "package.json"
+      ],
+      "specRef": "f5-providers-spend.md#F5.3.T1",
+      "comments": []
+    },
+    {
+      "id": "F5.3.T2",
+      "phase": 5,
+      "title": "README en portugués",
+      "description": "Actualizar `README.pt.md` para que tenga el mismo contenido y estructura\nque el `README.md` actualizado en F5.3.T1, traducido al portugués de\nBrasil.\n\nDone when: las secciones y bloques de código de `README.pt.md` coinciden uno\na uno con los de `README.md`.",
+      "model": "claude/claude-haiku-4-5",
+      "reason": "Traducción.",
+      "status": "backlog",
+      "dependencies": [
+        "F5.3.T1"
+      ],
+      "estimateHours": 1.0,
+      "files": [
+        "README.pt.md"
+      ],
+      "specRef": "f5-providers-spend.md#F5.3.T2",
+      "comments": []
+    }
+  ]
+}

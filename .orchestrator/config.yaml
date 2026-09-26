@@ -1,0 +1,154 @@
+# config.yaml — runtime knobs. Loaded by orch.py at startup.
+# All values copied verbatim from proposal/explore §2 defaults (Batch B seed).
+
+concurrency:
+  # Hard cap on TOTAL in-flight subprocesses across all backends (FR-D-5).
+  global_max: 8
+  # Per-backend caps (FR-D-5). AS-05 verifies claude cap holds.
+  per_provider:
+    claude: 3
+    codex: 2
+    opencode: 3
+    gemini: 2
+    agy: 2
+  # Per-file cap for the 33 tasks with declared `files[]` (opportunistic).
+  per_file: 1
+
+# Strict-files enforcement is OFF by default; enabled only for phase-10 tasks
+# (design.md OPEN — `git checkout --` can destroy concurrent work otherwise).
+strict_files_phases:
+  - 10
+
+# Multiplier applied to `estimateHours` for the subprocess timeout (FR-D-3).
+# Actual timeout = estimateHours * multiplier * 3600 seconds.
+default_timeout_multiplier: 1.5
+
+# Per-task spend limit, 5.00 USD by default. By default it only decides
+# whether a failing task may escalate to a pricier model on its third attempt.
+# Uncomment it to ALSO cap every claude dispatch with `--max-budget-usd`
+# (the cap is sent only when the key is written here).
+# budget:
+#   per_dispatch_usd: 5.00
+
+# FR-D-4 (design.md §5): wall-clock delay between a failed dispatch and its
+# retry. Uses `time.monotonic()` so it's immune to wall-clock jumps.
+# Fase B: RATE_LIMIT failures get a longer backoff so the provider's rate
+# window has time to reset before the retry hits it again.
+retry:
+  backoff_seconds: 5
+  rate_limit_backoff_seconds: 60
+
+# Fase 3 (multi-proyecto): prefijo aplicado a `Task.spec_ref` para armar la
+# línea `Spec ref (READ FIRST):` del prompt. Cada proyecto puede sobreescribir
+# esto (ej: `sdd/specs`, `docs/specs/`, `specs/`). Default: `specs`.
+spec_root: specs
+
+# Sprint B — pluggable state backend.
+# `state.backend`: "sqlite" (default) or "file" (legado, se elimina en la
+# reescritura — kept only so pre-v0.11 projects keep booting).
+# `state.sqlite_path`: absolute path or relative-to-state_dir path to the DB
+# file. Defaults to `<state_dir>/orch.db`. Ignored when backend == "file".
+state:
+  backend: sqlite
+  sqlite_path: null
+
+# Sprint 7 — provider budget guardrails.
+# `budgets_config` is the path to a `budgets.yaml` file, relative to this
+# directory first and then the project root (`orch init` writes it next to
+# this file). A missing file disables the gate; `orch doctor` warns about it.
+# `budgets_preset` picks which preset inside that file to use. `orch run`,
+# `orch doctor` and the dashboard all read these two keys.
+# `typical_dispatch_tokens` is the estimated tokens spent on ONE dispatch —
+# used by `orch doctor` for preset sanity (a provider whose `token_budget` is
+# < 2 * typical serializes dispatches inside the window), and by the gate as
+# the weight of a dispatch whose provider reported no token usage (gemini).
+budgets_config: budgets.yaml
+budgets_preset: conservative
+typical_dispatch_tokens: 200000
+
+# Dogfooding — let agents report problems with orch itself.
+# `enabled: true` turns on the MCP tool `orch_report_finding`: an agent files a
+# bug, improvement or feature request as an `auto-reported` issue on
+# hectorcanaimero/orch with your own `gh` login, and every dispatch prompt ends
+# with an optional "Feedback about orch itself" block. Off by default because
+# it publishes under your account. See docs/DOGFOODING.md.
+report_findings:
+  enabled: false
+
+# Sprint E-2 / E-3 — dashboard client (SPA + FastAPI) knobs. All optional.
+# `profile` / `token` gate the middleware (operator|stakeholder|both — see
+# orchestrator/dashboard/dashboard_config.py). Sprint H-2's `kanban`
+# defaults live in this same block — a second top-level
+# `dashboard:` key used to follow further down (bug 4, see
+# docs/brainstorm/go-migration-notes.md): PyYAML silently keeps only the
+# LAST block on a duplicate top-level key, so that second definition had
+# been clobbering show_spend_to_stakeholder/summary_language below since
+# H-2 shipped. Never split `dashboard:` across two blocks again.
+dashboard:
+  # profile: operator                                                     # operator | stakeholder | both
+  # token: ""                                                             # required when profile != operator
+  show_spend_to_stakeholder: false                                        # G-5: expose the Budget/spend view to stakeholders (off by default — spend is sensitive)
+  language: es                                                            # what the client reads (executive summary, portal, PDF) — en | es | pt; formerly summary_language
+  kanban:
+    wip_default: null          # integer or null. null = no WIP badge unless ?wip=N.
+    sort_default: null         # "impact" | null (default = phase asc + id asc).
+    group_default: null        # "phase" | null.
+    refresh_interval_s: 10     # HTMX polling cadence for the board.
+
+# Dashboard tunnel — share the dashboard over a Cloudflare quick tunnel
+# (https://<random>.trycloudflare.com; no Cloudflare account needed). Needs
+# `cloudflared` on PATH: the dashboard's Tunnel page shows how to install it
+# and has the start/stop button, or run `orch dashboard --tunnel`. Every
+# request through the tunnel must carry the token in the link orch prints,
+# and the link changes on every start.
+tunnel:
+  enabled: false
+
+# Sprint F-2 — git worktree isolation per task.
+# When worktree_mode is true, each dispatched task runs in a dedicated
+# git worktree (../<project>.worktrees/<task-id>/, next to the project, not
+# inside it) on branch orch/<task-id>, branched off base_branch. On agent
+# success the branch is pushed to origin with --force-with-lease. On failure the branch is NOT pushed. The worktree
+# directory is always cleaned up after the task exits (success or failure).
+dispatch:
+  worktree_mode: true    # on by default — set to false to run agents in-place
+  base_branch: main      # branch new worktrees are based on
+
+# Sprint F-4 — VCS integration (PR automation + CI polling).
+# Requires dispatch.worktree_mode: true to have any effect.
+# Auth via CLI tool (gh for GitHub, glab for GitLab) — user must be authenticated.
+# Silent degradation if CLI is not available.
+vcs:
+  provider: github           # github | gitlab
+  host: github.com           # self-hosted: gitlab.mycompany.com
+  auto_pr: true              # on by default — set to false to skip PR creation
+  ci_max_retries: 1          # CI-triggered re-dispatches before blocking the task
+  ci_poll_interval_s: 30     # seconds between CI status checks
+
+# Sprint G-1 — CI workflow auto-generation + auto-merge.
+# `orch init` generates .github/workflows/orch-ci.yml from this section
+# when it's absent from the target repo (never overwrites an existing one).
+github:
+  test_command: npm test       # command the generated CI workflow runs
+  auto_merge: false          # opt-in — requires branch protection on the repo
+
+# Sprint G-6 — Slack/Discord webhooks + `orch notify digest`.
+# Empty webhook URLs disable that channel. Failures are silent by design —
+# a broken webhook never surfaces into the dispatch loop. Triggers today:
+# task moved to `blocked`, and CI blocked after ci_max_retries.
+notifications:
+  slack_webhook: ""          # https://hooks.slack.com/services/...
+  discord_webhook: ""        # https://discord.com/api/webhooks/...
+  timeout_s: 5               # per-request timeout for the POST
+
+# Presentation layer — labels shown in the dashboard UI.
+# Override any key to use your own language. Internal status values never change.
+presentation:
+  status_labels:
+    backlog:     "Planificado"
+    todo:        "Por hacer"
+    in_progress: "En progreso"
+    in-progress: "En progreso"
+    done:        "Entregado"
+    blocked:     "Bloqueado"
+    skipped:     "Omitido"

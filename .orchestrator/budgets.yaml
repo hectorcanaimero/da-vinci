@@ -1,0 +1,88 @@
+# budgets.yaml — provider quota guardrails (Sprint 7).
+#
+# Purpose: keep long unattended `--mode auto` runs from burning through your
+# subscription quota (Claude Max, Codex Pro, opencode plan). When usage in the
+# rolling window crosses `threshold_pct * token_budget`, orch stops dispatching
+# NEW work to that provider until the oldest in-window entry falls out.
+#
+# HOW TO CALIBRATE token_budget:
+#   These numbers are conservative guesses. The right values come from
+#   observation:
+#     1. Start with `conservative` preset.
+#     2. Run for a week. Note when Anthropic/OpenAI/opencode cut you off in
+#        real usage.
+#     3. Set `token_budget` = the tokens you consumed in that window * 0.9.
+#     4. Bump `threshold_pct` up (60 → 75 → 85) once you're confident.
+#   Tokens are every input token a dispatch processed — cache reads and cache
+#   writes included, which is most of a claude or opencode dispatch — plus
+#   output. The dashboard's Budget page shows the window as orch counts it.
+#
+# HOW TO PICK A PRESET:
+#   - conservative → default. Safe, may leave capacity unused.
+#   - aggressive   → maximizes throughput, higher risk of exhausting your
+#                    quota so YOU can't use Claude in your terminal for 5h.
+#   - shared       → reserves ~60% of quota for you (interactive use during
+#                    working hours). Best when you leave orch running while
+#                    you're also coding.
+#
+# The preset is `budgets_preset` in config.yaml (default `conservative`); there
+# is no CLI flag or environment variable for it.
+#
+# window_hours is the rolling window Anthropic/OpenAI/opencode enforce for
+# THEIR rate limits — not something you tune. Values below match public docs
+# as of 2026-08.
+
+presets:
+  conservative:
+    claude:
+      window_hours: 5
+      token_budget: 800000
+      threshold_pct: 60
+    codex:
+      window_hours: 3
+      token_budget: 400000
+      threshold_pct: 60
+    opencode:
+      window_hours: 24
+      token_budget: 2000000
+      threshold_pct: 70
+    agy:
+      window_hours: 24
+      token_budget: 2000000
+      threshold_pct: 70
+
+  aggressive:
+    claude:
+      window_hours: 5
+      token_budget: 800000
+      threshold_pct: 90
+    codex:
+      window_hours: 3
+      token_budget: 400000
+      threshold_pct: 90
+    opencode:
+      window_hours: 24
+      token_budget: 2000000
+      threshold_pct: 95
+    agy:
+      window_hours: 24
+      token_budget: 2000000
+      threshold_pct: 95
+
+  shared:
+    claude:
+      window_hours: 5
+      token_budget: 800000
+      threshold_pct: 40
+    codex:
+      window_hours: 3
+      token_budget: 400000
+      threshold_pct: 40
+    opencode:
+      window_hours: 24
+      token_budget: 2000000
+      threshold_pct: 60
+    agy:
+      window_hours: 24
+      token_budget: 2000000
+      threshold_pct: 60
