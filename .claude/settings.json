@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(mkdir:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(sed -n:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "mcp__orch__orch_block",
+      "mcp__orch__orch_get_task",
+      "mcp__orch__orch_context",
+      "mcp__orch__orch_events",
+      "mcp__orch__orch_list_tasks"
+    ]
+  }
+}

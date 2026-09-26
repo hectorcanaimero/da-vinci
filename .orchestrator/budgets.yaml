@@ -36,8 +36,8 @@ presets:
   conservative:
     claude:
       window_hours: 5
-      token_budget: 800000
-      threshold_pct: 60
+      token_budget: 800000000000
+      threshold_pct: 90
     codex:
       window_hours: 3
       token_budget: 400000
