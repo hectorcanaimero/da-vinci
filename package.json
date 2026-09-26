@@ -8,12 +8,13 @@
     "davinci": "./src/generate.mjs"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "start": "node src/generate.mjs",
     "install:setup": "node install.mjs",
-    "lint": "node --check src/generate.mjs && node --check src/utils/*.mjs && node --check src/providers/*.mjs",
+    "lint": "node --check src/generate.mjs && node --check src/utils/*.mjs && node --check src/providers/*.mjs && node --check src/core/*.mjs && node --check src/library/*.mjs",
+    "test": "node --test test/*.test.mjs",
     "test:secrets": "node -e \"import('./src/utils/secrets.mjs').then(m => m.loadSecrets().then(s => console.log('OK. Source:', s.source, 'Keys:', Object.keys(s.secrets))))\""
   },
   "keywords": [
