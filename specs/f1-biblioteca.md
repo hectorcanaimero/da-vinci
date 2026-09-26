@@ -254,7 +254,7 @@ Nuevo subcomando `import <ruta-a-manifest.json>` que usa `importManifest` e
 imprime `{imported, skipped}`. `--help` los documenta.
 
 En `package.json`: `engines.node` → `>=22.13.0`, script `"test": "node
---test test/"`, y `lint` incluye `src/core/*.mjs src/library/*.mjs`.
+--test test/*.test.mjs"` (no `test/` a secas: en Node 24 falla), y `lint` incluye `src/core/*.mjs src/library/*.mjs`.
 
 Done when: `npm test` pasa entero, e incluye `test/cli.test.mjs` que corre
 el CLI como proceso hijo con un `--import` de un módulo que mockea `fetch`
