@@ -11,7 +11,7 @@ export const routes = [
     path: '/api/providers',
     async handler(req, res, { send }) {
       const status = await getProvidersStatus();
-      send(200, status);
+      send(200, { items: status });
     },
   },
   {
