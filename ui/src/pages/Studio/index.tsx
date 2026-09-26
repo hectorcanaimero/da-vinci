@@ -1,11 +1,12 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ApiError, createGeneration, estimate, fileUrl, getGeneration, listModels } from '../../api';
+import AssetPicker, { Thumb, type PickedInput } from '../../components/AssetPicker';
 import { upsertJob, useJobs } from '../../sse';
 import type { Estimate, Generation, GenerationRequest, Kind, ModelInfo } from '../../types';
 
 type Field = 'prompt' | 'text' | 'script' | 'avatar' | 'voice' | 'aspect' | 'duration' | 'quality' | 'n'
-  | 'style' | 'texture' | 'pbr' | 'engine' | 'input';
+  | 'style' | 'texture' | 'pbr' | 'engine';
 
 // Only the fields that apply to each kind.
 const FIELDS: Record<Kind, Field[]> = {
@@ -16,8 +17,8 @@ const FIELDS: Record<Kind, Field[]> = {
   audio: ['text', 'voice'],
   sfx: ['prompt', 'duration'],
   'avatar-video': ['script', 'avatar', 'voice'],
-  'bg-remove': ['input'],
-  upscale: ['input', 'engine'],
+  'bg-remove': [],
+  upscale: ['engine'],
 };
 const NUMERIC: Field[] = ['duration', 'n'];
 const BOOLEAN: Field[] = ['texture', 'pbr'];
@@ -25,13 +26,13 @@ const MULTILINE: Field[] = ['prompt', 'text', 'script'];
 const LABEL: Record<Field, string> = {
   prompt: 'Prompt', text: 'Texto', script: 'Guion', avatar: 'Avatar', voice: 'Voz', aspect: 'Aspecto (1:1, 16:9…)',
   duration: 'Duración (s)', quality: 'Calidad', n: 'Cantidad', style: 'Estilo', engine: 'Motor de upscale',
-  input: 'URL de la imagen', texture: 'Textura', pbr: 'PBR',
+  texture: 'Textura', pbr: 'PBR',
 };
 const KINDS = Object.keys(FIELDS) as Kind[];
 
 type Values = Partial<Record<Field, string | boolean>>;
 
-function buildRequest(kind: Kind, model: string, v: Values): GenerationRequest {
+function buildRequest(kind: Kind, model: string, v: Values, inputs: PickedInput[]): GenerationRequest {
   const has = (f: Field) => FIELDS[kind].includes(f);
   const str = (f: Field) => {
     const x = has(f) && typeof v[f] === 'string' ? (v[f] as string).trim() : '';
@@ -43,7 +44,7 @@ function buildRequest(kind: Kind, model: string, v: Values): GenerationRequest {
   };
   const req: GenerationRequest = { kind, model: model || undefined, prompt: str('prompt'), text: str('text'),
     script: str('script'), avatar: str('avatar'), voice: str('voice') };
-  if (str('input')) req.inputs = [{ url: str('input')! }];
+  if (inputs.length) req.inputs = inputs.map((i) => (i.id ? { id: i.id } : { url: i.url! }));
   const params = {
     aspect: str('aspect'), duration: num('duration'), quality: str('quality'), n: num('n'),
     style: str('style'), engine: str('engine'),
@@ -56,10 +57,26 @@ function buildRequest(kind: Kind, model: string, v: Values): GenerationRequest {
 
 const usd = (n: number) => `$${n.toFixed(3)}`;
 
+const INPUT_KINDS: Kind[] = ['bg-remove', 'upscale']; // always need an input, even before models load
+
 export default function Studio() {
-  const [kind, setKind] = useState<Kind>('image');
+  const [params] = useSearchParams();
+  // Query preload (?kind&model&input=…&prompt), read once on mount.
+  const [init] = useState(() => {
+    const k = params.get('kind') as Kind | null;
+    return { kind: k && KINDS.includes(k) ? k : 'image' as Kind, model: params.get('model') ?? '',
+      prompt: params.get('prompt'), inputs: params.getAll('input').filter(Boolean) };
+  });
+  const initModel = useRef(init.model);
+  const [kind, setKind] = useState<Kind>(init.kind);
   const [model, setModel] = useState('');
-  const [values, setValues] = useState<Values>({});
+  const [values, setValues] = useState<Values>(() => {
+    const f = FIELDS[init.kind].find((x) => MULTILINE.includes(x));
+    return init.prompt && f ? { [f]: init.prompt } : {};
+  });
+  const [inputs, setInputs] = useState<PickedInput[]>(() =>
+    init.inputs.map((x) => (/^https?:\/\//.test(x) ? { url: x } : { id: x })));
+  const [picking, setPicking] = useState(false);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [est, setEst] = useState<Estimate | null>(null);
   const [estError, setEstError] = useState<string | null>(null);
@@ -69,10 +86,21 @@ export default function Studio() {
   const [submitted, setSubmitted] = useState<string[]>([]);
   const jobs = useJobs();
 
-  const request = useMemo(() => buildRequest(kind, model, values), [kind, model, values]);
+  const request = useMemo(() => buildRequest(kind, model, values, inputs), [kind, model, values, inputs]);
+  const chosen = models.find((m) => m.id === model);
+  const maxInputs = chosen ? chosen.acceptsInputs
+    : models.some((m) => m.acceptsInputs === 'many') ? 'many' : models.some((m) => m.acceptsInputs === 1) ? 1 : 0;
+  const showInputs = maxInputs !== 0 || INPUT_KINDS.includes(kind);
+
+  // Preloaded ids have no mime yet: fetch it for the thumbnails.
+  useEffect(() => {
+    inputs.filter((i) => i.id && !i.mime).forEach((i) =>
+      getGeneration(i.id!).then((g) => setInputs((p) => p.map((x) => (x.id === i.id ? { ...x, mime: g.mime } : x)))).catch(() => {}));
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    setModel('');
+    setModel(initModel.current);
+    initModel.current = '';
     setModels([]);
     listModels(kind).then((r) => setModels(r.items)).catch(() => {});
   }, [kind]);
@@ -99,6 +127,7 @@ export default function Studio() {
       upsertJob(job);
       setSubmitted((p) => [job.id, ...p]);
       setValues({}); // ready for another generation
+      setInputs([]);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'cost_confirm_required') setPending(e.details as Estimate);
       else if (e instanceof ApiError && e.code === 'budget_exceeded') {
@@ -139,6 +168,18 @@ export default function Studio() {
             </label>
           </div>
         ))}
+        {showInputs && (
+          <div>
+            Inputs{' '}
+            {inputs.map((i, n) => (
+              <span key={i.id ?? i.url}>
+                <Thumb input={i} />
+                <button type="button" aria-label="Quitar" onClick={() => setInputs((p) => p.filter((_, m) => m !== n))}>×</button>
+              </span>
+            ))}{' '}
+            <button type="button" onClick={() => setPicking(true)}>Elegir de la biblioteca…</button>
+          </div>
+        )}
         <div>
           <label>Modelo{' '}
             <select value={model} onChange={(e) => setModel(e.target.value)}>
@@ -166,6 +207,11 @@ export default function Studio() {
         {error && <p role="alert">{error}</p>}
         <button type="submit" disabled={busy}>Generar</button>
       </form>
+
+      {picking && (
+        <AssetPicker multiple={maxInputs === 'many'} onClose={() => setPicking(false)}
+          onPick={(items) => { setInputs((p) => (maxInputs === 'many' ? [...p, ...items] : items)); setPicking(false); }} />
+      )}
 
       {pending && (
         <dialog open role="alertdialog">
