@@ -32,7 +32,10 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 package-lock.json
+!ui/package-lock.json
 yarn.lock
+dist/
+ui/node_modules/
 
 # ── OS ──────────────────────────────────────────────────────────────
 .DS_Store
