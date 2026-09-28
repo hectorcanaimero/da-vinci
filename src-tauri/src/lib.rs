@@ -35,6 +35,8 @@ pub struct KeyStatus {
 pub struct AgentInfo {
     pub name: String,
     pub path: String,
+    pub version: Option<String>,
+    pub available: bool,
 }
 
 #[derive(Serialize)]
@@ -120,7 +122,7 @@ fn secrets_delete(provider: String) -> Result<(), String> {
 
 #[tauri::command]
 fn agent_detect() -> Result<Vec<AgentInfo>, String> {
-    Err(NOT_IMPLEMENTED.into())
+    Ok(agent::detect())
 }
 
 #[tauri::command]
