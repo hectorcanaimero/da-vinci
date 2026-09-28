@@ -3,6 +3,7 @@ import ApiKeyGate from './components/ApiKeyGate';
 import CommandPalette from './components/CommandPalette';
 import Layout from './components/Layout';
 import Titlebar from './components/Titlebar';
+import Asset from './pages/Asset';
 import Library from './pages/Library';
 import Studio from './pages/Studio';
 
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="estudio" element={<Studio />} />
             <Route path="galeria" element={<Library />} />
             <Route path="actividad" element={<Placeholder title="Actividad" />} />
+            <Route path="asset/:id" element={<Asset />} />
             <Route path="gastos" element={<Placeholder title="Gastos" />} />
             <Route path="ajustes" element={<Placeholder title="Ajustes" />} />
             <Route path="*" element={<Placeholder title="Chat" />} />
