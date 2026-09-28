@@ -25,7 +25,10 @@ function composite(size, outPath) {
   magick([
     '-size', `${size}x${size}`, `xc:${BG}`,
     '(', SOURCE_GLYPH, '-resize', `${glyphSize}x${glyphSize}`, ')',
-    '-gravity', 'center', '-composite', outPath,
+    // El prefijo PNG32: fuerza colorType 6. Sin el, ImageMagick escribe RGB
+    // cuando la imagen sale totalmente opaca y `tauri::generate_context!`
+    // aborta con "icon ... is not RGBA".
+    '-gravity', 'center', '-composite', `PNG32:${outPath}`,
   ]);
 }
 
