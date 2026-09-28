@@ -180,6 +180,10 @@ pub fn run() {
         // D7: actualizador firmado con clave propia, verifica la firma de cada
         // artefacto antes de instalarlo (config en tauri.conf.json).
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // Diálogo nativo de archivos para adjuntar referencias (F3.3.T1).
+        // La capability suma `dialog:default` y nada más: sigue sin
+        // `shell:allow-execute` (decisión D8).
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // D9: macOS keeps native decorations (titleBarStyle: Overlay in
             // tauri.conf.json draws the traffic lights over our bar); Windows

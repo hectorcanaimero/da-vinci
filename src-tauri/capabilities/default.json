@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability por defecto: sólo los permisos core de la ventana principal. Sin shell:allow-execute (decisión D8).",
+  "description": "Capability por defecto: permisos core de la ventana, el actualizador (D7) y el diálogo nativo de archivos (F3.3.T1). Sin shell:allow-execute — la decisión D8 deja a Rust como único camino a ejecutar procesos.",
   "windows": ["main"],
-  "permissions": ["core:default", "updater:default"]
+  "permissions": ["core:default", "updater:default", "dialog:default"]
 }
