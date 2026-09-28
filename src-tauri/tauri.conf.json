@@ -6,8 +6,8 @@
   "build": {
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist/ui",
-    "beforeDevCommand": "npm --prefix ../ui run dev",
-    "beforeBuildCommand": "npm --prefix ../ui run build"
+    "beforeDevCommand": "npm --prefix ui run dev",
+    "beforeBuildCommand": "npm --prefix ui run build"
   },
   "app": {
     "windows": [
@@ -25,6 +25,6 @@
   },
   "bundle": {
     "externalBin": ["binaries/node"],
-    "resources": ["../src/**/*", "../dist/ui/**/*"]
+    "resources": ["../src/**/*", "../dist/ui/**/*", "../package.json"]
   }
 }
