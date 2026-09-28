@@ -69,6 +69,11 @@ export const createGeneration = (r: GenerationRequest) => request<{ job: Job }>(
 export const listJobs = (status?: string, limit?: number) =>
   request<{ items: Job[] }>('GET', `/api/jobs${qs({ status, limit })}`);
 export const getJob = (id: string) => request<Job>('GET', `/api/jobs/${enc(id)}`);
+export const resumeJob = (id: string) => request<Job>('POST', `/api/jobs/${enc(id)}/resume`);
+export const discardJob = (id: string) => request<Job>('POST', `/api/jobs/${enc(id)}/discard`);
+export const getQueue = () => request<{ concurrency: number; paused: boolean }>('GET', '/api/queue');
+export const pauseQueue = () => request<{ paused: boolean }>('POST', '/api/queue/pause');
+export const resumeQueue = () => request<{ paused: boolean }>('POST', '/api/queue/resume');
 export const listLibrary = (q?: LibraryQuery) =>
   request<{ items: Generation[]; nextCursor: string | null }>('GET', `/api/library${qs(q)}`);
 export const getGeneration = (id: string) =>

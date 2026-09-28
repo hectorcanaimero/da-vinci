@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Route, Routes } from 'react-router-dom';
+import Activity from './pages/Activity';
 import { listProviders } from './api';
 import ApiKeyGate from './components/ApiKeyGate';
 import CommandPalette from './components/CommandPalette';
@@ -54,7 +55,7 @@ export default function App() {
               <Route index element={<Placeholder title="Chat" />} />
               <Route path="estudio" element={<Studio />} />
               <Route path="galeria" element={<Library />} />
-              <Route path="actividad" element={<Placeholder title="Actividad" />} />
+              <Route path="actividad" element={<Activity />} />
               <Route path="asset/:id" element={<Asset />} />
               <Route path="gastos" element={<Placeholder title="Gastos" />} />
               <Route path="ajustes" element={<Placeholder title="Ajustes" />} />

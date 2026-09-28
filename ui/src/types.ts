@@ -31,7 +31,7 @@ export type Generation = {
   url: string;
 };
 
-export type JobStatus = 'queued' | 'running' | 'done' | 'failed';
+export type JobStatus = 'queued' | 'running' | 'done' | 'failed' | 'interrupted' | 'discarded';
 
 export type Job = {
   id: string; createdAt: string; updatedAt: string; status: JobStatus; source: string;

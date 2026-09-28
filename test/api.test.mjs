@@ -40,7 +40,7 @@ before(async () => {
   events = new EventEmitter();
   events.on('generation.deleted', (e) => seen.push(e));
   jobs = createJobQueue({ library, router, events, outDir: dir });
-  server = createServer({ config: { host: '127.0.0.1', apiKey: null }, library, router, jobs, events });
+  server = createServer({ config: { host: '127.0.0.1', apiKey: null, concurrency: 3 }, library, router, jobs, events });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   base = `http://127.0.0.1:${server.address().port}`;
 });
@@ -112,6 +112,14 @@ test('library: filtro, detalle con lineage, favorito, delete', async () => {
   assert.deepEqual(seen, [{ id: child.id }]);
   assert.equal(existsSync(filePath), false);
   assert.equal((await call(`/api/library/${child.id}`)).status, 404);
+});
+
+test('queue: estado y pausar/reanudar (F6.2.T1)', async () => {
+  assert.deepEqual((await call('/api/queue')).body, { concurrency: 3, paused: false });
+  assert.deepEqual((await call('/api/queue/pause', { method: 'POST' })).body, { paused: true });
+  assert.deepEqual((await call('/api/queue')).body, { concurrency: 3, paused: true });
+  assert.deepEqual((await call('/api/queue/resume', { method: 'POST' })).body, { paused: false });
+  assert.deepEqual((await call('/api/queue')).body, { concurrency: 3, paused: false });
 });
 
 test('spend con totalUsd e import', async () => {
