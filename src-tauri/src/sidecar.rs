@@ -138,7 +138,9 @@ pub fn spawn<R: Runtime>(app: &AppHandle<R>) -> Result<Sidecar, String> {
         .args(["--port", "0", "--host", "127.0.0.1"])
         .env("DAVINCI_HOME", &home)
         .env("REVERON_PARENT", "1")
-        // ponytail: las llaves las inyecta secrets.rs cuando exista (F2.1.T1).
+        // D4: las llaves del llavero van como env del hijo; `secrets.mjs` ya
+        // trata process.env como una de sus fuentes, cero cambios del lado Node.
+        .envs(crate::secrets::env_pairs())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit())
@@ -179,6 +181,62 @@ pub fn spawn<R: Runtime>(app: &AppHandle<R>) -> Result<Sidecar, String> {
                     HANDSHAKE_TIMEOUT.as_secs()
                 ),
             })
+        }
+    }
+}
+
+/// Rotación en caliente (D4): `PUT /api/providers/:id/key` contra el propio
+/// servidor, que ya sabe adoptar la llave nueva sin reiniciar. Sólo si esa
+/// llamada falla se relanza el sidecar entero como último recurso.
+pub async fn rotate_key<R: Runtime>(
+    app: &AppHandle<R>,
+    provider: &str,
+    value: &str,
+) -> Result<(), String> {
+    let id = provider
+        .strip_suffix("_API_KEY")
+        .unwrap_or(provider)
+        .to_lowercase();
+
+    if let Some(url) = current_url(app) {
+        let put = reqwest::Client::new()
+            .put(format!("{url}/api/providers/{id}/key"))
+            .json(&serde_json::json!({ "key": value }))
+            .send()
+            .await
+            .and_then(reqwest::Response::error_for_status);
+        if put.is_ok() {
+            return Ok(());
+        }
+    }
+
+    restart(app)
+}
+
+fn current_url<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
+    let state = app.try_state::<SidecarState>()?;
+    let process = state.process.lock().unwrap();
+    process.as_ref().map(Sidecar::url)
+}
+
+/// Mata el proceso viejo (si hay) y lanza uno nuevo, que ya arranca con la
+/// llave nueva porque `secrets::env_pairs` la lee del llavero recién escrito.
+fn restart<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+    let state = app
+        .try_state::<SidecarState>()
+        .ok_or("el plugin del sidecar no está montado")?;
+    if let Some(old) = state.process.lock().unwrap().take() {
+        old.kill();
+    }
+    match spawn(app) {
+        Ok(sidecar) => {
+            *state.process.lock().unwrap() = Some(sidecar);
+            *state.last_error.lock().unwrap() = None;
+            Ok(())
+        }
+        Err(error) => {
+            *state.last_error.lock().unwrap() = Some(error.clone());
+            Err(error)
         }
     }
 }

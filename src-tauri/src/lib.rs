@@ -99,8 +99,18 @@ fn secrets_list() -> Result<Vec<KeyStatus>, String> {
 }
 
 #[tauri::command]
-fn secrets_set(provider: String, value: String) -> Result<KeyStatus, String> {
-    secrets::set(&provider, &value)
+async fn secrets_set(
+    app: tauri::AppHandle,
+    provider: String,
+    value: String,
+) -> Result<KeyStatus, String> {
+    let status = secrets::set(&provider, &value)?;
+    // D4: best-effort. La llave ya quedó guardada; si ni el PUT en caliente ni
+    // el reinicio de respaldo funcionan, el próximo arranque la toma igual.
+    if let Err(error) = sidecar::rotate_key(&app, &provider, &value).await {
+        eprintln!("[sidecar] no pude rotar la llave en caliente: {error}");
+    }
+    Ok(status)
 }
 
 #[tauri::command]
