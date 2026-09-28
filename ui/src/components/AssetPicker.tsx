@@ -2,18 +2,28 @@ import { useEffect, useState } from 'react';
 import { fileUrl, listLibrary } from '../api';
 import type { Generation, Kind } from '../types';
 
-export type PickedInput = { id?: string; url?: string; mime?: string };
+// `path` es un archivo local (arrastrado desde el SO, todavía no subido) —
+// no hay id ni url para previsualizarlo, sólo el nombre.
+export type PickedInput = { id?: string; url?: string; path?: string; name?: string; mime?: string };
 
 const KINDS: Kind[] = ['image', 'svg', 'video', 'audio', 'sfx', 'model-3d', 'bg-remove', 'upscale', 'avatar-video'];
 
-export function Thumb({ input }: { input: PickedInput }) {
+export function Thumb({ input, size = 64 }: { input: PickedInput; size?: number }) {
+  if (!input.id && !input.url) {
+    const ext = (input.name ?? input.path ?? '').split('.').pop()?.toUpperCase();
+    return (
+      <span style={{
+        width: size, height: size, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        borderRadius: 6, background: 'var(--bg-elevated)', color: 'var(--text-muted)',
+        fontSize: 10, fontFamily: 'var(--font-mono)',
+      }}>{ext || '?'}</span>
+    );
+  }
   const src = input.id ? fileUrl(input.id) : input.url!;
   const mime = input.mime ?? '';
-  if (mime.startsWith('video/')) return <video src={src} muted style={{ width: 64, height: 64, objectFit: 'cover' }} />;
-  if (mime.startsWith('image/') || !input.id) {
-    return <img src={src} alt={input.id ?? input.url} style={{ width: 64, height: 64, objectFit: 'cover' }} />;
-  }
-  return <span>{input.id}</span>;
+  const style = { width: size, height: size, objectFit: 'cover' as const, borderRadius: 6 };
+  if (mime.startsWith('video/')) return <video src={src} muted style={style} />;
+  return <img src={src} alt={input.id ?? input.url} style={style} />;
 }
 
 // Modal to pick library assets (search + kind filter) or paste a URL.
