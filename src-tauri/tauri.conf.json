@@ -1,0 +1,28 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Reverón",
+  "version": "0.1.0",
+  "identifier": "lat.guria.reveron",
+  "build": {
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist/ui",
+    "beforeDevCommand": "npm --prefix ../ui run dev",
+    "beforeBuildCommand": "npm --prefix ../ui run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Reverón",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 1024,
+        "minHeight": 700
+      }
+    ]
+  },
+  "bundle": {
+    "externalBin": ["binaries/node"],
+    "resources": ["../src/**/*", "../dist/ui/**/*"]
+  }
+}
