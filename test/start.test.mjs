@@ -8,7 +8,7 @@ import { openLibrary } from '../src/library/db.mjs';
 
 const CLI = new URL('../src/generate.mjs', import.meta.url).pathname;
 
-test('serve arranca, responde /api/health y falla los jobs interrumpidos', async () => {
+test('serve arranca, responde /api/health y deja recuperables los jobs interrumpidos', async () => {
   const home = await mkdtemp(join(tmpdir(), 'davinci-start-'));
   const seed = openLibrary(home);
   const { id } = seed.jobs.create({ request: { intent: 'image' }, source: 'test', status: 'running' });
@@ -34,7 +34,7 @@ test('serve arranca, responde /api/health y falla los jobs interrumpidos', async
     const lib = openLibrary(home);
     const job = lib.jobs.get(id);
     lib.close();
-    assert.equal(job.status, 'failed');
+    assert.equal(job.status, 'interrupted');
     assert.equal(job.error.code, 'interrupted');
   } finally {
     const exited = new Promise((r) => child.once('exit', r));

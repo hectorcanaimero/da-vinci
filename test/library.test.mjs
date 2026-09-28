@@ -83,16 +83,17 @@ test('spend by provider + spentToday', () => {
   assert.equal(lib.spentToday(), 3);
 });
 
-test('jobs + failInterrupted', () => {
+test('jobs + markInterrupted', () => {
   const lib = openLibrary(home());
   lib.jobs.create({ id: 'j1', source: 'api', request: { kind: 'image' } });
   lib.jobs.create({ id: 'j2', source: 'api', request: {}, status: 'running' });
   lib.jobs.create({ id: 'j3', source: 'api', request: {} });
   lib.jobs.update('j3', { status: 'done', generationIds: ['x'] });
   assert.equal(lib.jobs.get('j3').generationIds[0], 'x');
-  assert.equal(lib.jobs.failInterrupted(), 2);
+  assert.equal(lib.jobs.markInterrupted(), 2);
   assert.equal(lib.jobs.get('j1').error.code, 'interrupted');
-  assert.equal(lib.jobs.list({ status: 'failed' }).length, 2);
+  assert.equal(lib.jobs.list({ status: 'interrupted' }).length, 2);
+  assert.equal(lib.jobs.list({ status: 'failed' }).length, 0);
 });
 
 test('two handles on same home', () => {

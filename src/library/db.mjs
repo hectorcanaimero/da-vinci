@@ -52,6 +52,9 @@ const MIGRATIONS = [
     generation_ids TEXT,
     error TEXT
   );`,
+  // Aditiva: `status` es TEXT libre, así que admitir 'interrupted'/'discarded' no pide DDL;
+  // sólo falta el contador de intentos que usa el reintento con espera creciente (F6.1.T2).
+  'ALTER TABLE jobs ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0;',
 ];
 
 const json = (s) => (s == null ? null : JSON.parse(s));
@@ -69,8 +72,14 @@ const toGeneration = (r, inputs) => ({
 const toJob = (r) => r && ({
   id: r.id, createdAt: r.created_at, updatedAt: r.updated_at, status: r.status,
   source: r.source, request: json(r.request), generationIds: json(r.generation_ids),
-  error: json(r.error),
+  error: json(r.error), attempts: r.attempts ?? 0,
 });
+
+// Un trabajo a medias no es un trabajo gratis: el proveedor pudo haber cobrado igual.
+export const INTERRUPTED = {
+  code: 'interrupted',
+  message: 'Quedó a medias al cerrarse la app. Puede que el proveedor lo haya cobrado igual.',
+};
 
 // A date-only upper bound covers the whole day.
 const hi = (v) => (v.length === 10 ? `${v}T23:59:59.999Z` : v);
@@ -228,21 +237,25 @@ export function openLibrary(home = resolveHome()) {
         const t = now();
         const id = j.id ?? randomUUID();
         tx(() => run(
-          'INSERT INTO jobs (id, created_at, updated_at, status, source, request, generation_ids, error) VALUES (?,?,?,?,?,?,?,?)',
+          'INSERT INTO jobs (id, created_at, updated_at, status, source, request, generation_ids, error, attempts) VALUES (?,?,?,?,?,?,?,?,?)',
           id, j.createdAt ?? t, j.updatedAt ?? t, j.status ?? 'queued', j.source,
           JSON.stringify(j.request), j.generationIds ? JSON.stringify(j.generationIds) : null,
-          j.error ? JSON.stringify(j.error) : null,
+          j.error ? JSON.stringify(j.error) : null, j.attempts ?? 0,
         ));
         return lib.jobs.get(id);
       },
       update(id, patch) {
-        const cols = { status: 'status', request: 'request', generationIds: 'generation_ids', error: 'error' };
+        const cols = {
+          status: 'status', request: 'request', generationIds: 'generation_ids',
+          error: 'error', attempts: 'attempts',
+        };
+        const raw = new Set(['status', 'attempts']); // columnas escalares: van sin JSON
         const sets = ['updated_at = ?'];
         const a = [now()];
         for (const [k, c] of Object.entries(cols)) {
           if (!(k in patch)) continue;
           sets.push(`${c} = ?`);
-          a.push(k === 'status' || patch[k] == null ? patch[k] ?? null : JSON.stringify(patch[k]));
+          a.push(raw.has(k) || patch[k] == null ? patch[k] ?? null : JSON.stringify(patch[k]));
         }
         tx(() => run(`UPDATE jobs SET ${sets.join(', ')} WHERE id = ?`, ...a, id));
         return lib.jobs.get(id);
@@ -254,10 +267,11 @@ export function openLibrary(home = resolveHome()) {
           ...(status ? [status] : []), limit,
         ).map(toJob);
       },
-      failInterrupted() {
+      // Al arrancar: lo que quedó a medias no está fallido, está recuperable (FR-27).
+      markInterrupted() {
         return tx(() => Number(run(
-          "UPDATE jobs SET status = 'failed', error = ?, updated_at = ? WHERE status IN ('queued','running')",
-          JSON.stringify({ code: 'interrupted', message: 'Interrupted by server restart' }), now(),
+          "UPDATE jobs SET status = 'interrupted', error = ?, updated_at = ? WHERE status IN ('queued','running')",
+          JSON.stringify(INTERRUPTED), now(),
         ).changes));
       },
     },
