@@ -23,7 +23,8 @@ test('concurrencia 2 con 5 jobs, un fallo no frena la cola, eventos en orden, pe
       active++; max = Math.max(max, active);
       await new Promise((r) => setTimeout(r, 10));
       active--;
-      if (req.boom) throw Object.assign(new Error('boom'), { code: 'provider_error' });
+      // provider_rejected: no reintentable (D9) — este test cubre que un fallo no frena la cola, no el reintento.
+      if (req.boom) throw Object.assign(new Error('boom'), { code: 'provider_rejected' });
       return [{ id: `g${req.n}` }];
     },
   };
@@ -40,7 +41,7 @@ test('concurrencia 2 con 5 jobs, un fallo no frena la cola, eventos en orden, pe
   }
   const f = library.jobs.get(jobs[1].id);
   assert.equal(f.status, 'failed');
-  assert.deepEqual(f.error, { code: 'provider_error', message: 'boom' });
+  assert.deepEqual(f.error, { code: 'provider_rejected', message: 'boom' });
   const d = library.jobs.get(jobs[4].id);
   assert.equal(d.status, 'done');
   assert.deepEqual(d.generationIds, ['g4']);
