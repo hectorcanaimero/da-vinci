@@ -5,15 +5,18 @@ import { randomUUID } from 'node:crypto';
 
 /**
  * Cada entry en el manifest es un registro auditable de una generación.
- * Vive en <projectDir>/assets/generated/manifest.json
+ * Vive en <projectDir>/assets/generated/manifest.json, salvo que se pase
+ * `assetsDir` explícito (Ajustes → Almacenamiento, FR-46, config.json). Se
+ * recibe por parámetro en vez de leerse acá para no acoplar este módulo —lo
+ * usa el CLI puro también— a `core/config.mjs` y a su estado ambiente.
  */
 
-export function resolveOutputDir(projectRoot = process.cwd()) {
-  return resolve(projectRoot, 'assets', 'generated');
+export function resolveOutputDir(projectRoot = process.cwd(), assetsDir = null) {
+  return assetsDir ? resolve(assetsDir) : resolve(projectRoot, 'assets', 'generated');
 }
 
-export function resolveManifestPath(projectRoot = process.cwd()) {
-  return join(resolveOutputDir(projectRoot), 'manifest.json');
+export function resolveManifestPath(projectRoot = process.cwd(), assetsDir = null) {
+  return join(resolveOutputDir(projectRoot, assetsDir), 'manifest.json');
 }
 
 async function readManifest(path) {

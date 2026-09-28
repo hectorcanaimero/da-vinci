@@ -1,12 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { listLibrary } from '../../api';
+import VirtualGrid from '../../components/VirtualGrid';
 import { useServerEvents } from '../../sse';
 import type { Generation } from '../../types';
 import Card from './Card';
+import EmptyState from './EmptyState';
 import Filters from './Filters';
 import ListView from './ListView';
 import './library.css';
+
+const CARD_MIN_WIDTH = 200;
+const CARD_GAP = 16;
+const CARD_ROW_HEIGHT = 260;
 
 const LIMIT = 60;
 
@@ -147,10 +153,20 @@ export default function Library() {
 
       {state === 'error' && <p role="alert" className="lib-state">No se pudo cargar la biblioteca. <button onClick={load}>Reintentar</button></p>}
       {state === 'loading' && <p className="lib-state">Cargando…</p>}
-      {state === 'ok' && items.length === 0 && <p className="lib-state">No hay generaciones que coincidan.</p>}
+      {state === 'ok' && items.length === 0 && !get('q') && !get('kind') && !get('favorite')
+        && <EmptyState onImported={load} />}
+      {state === 'ok' && items.length === 0 && (get('q') || get('kind') || get('favorite'))
+        && <p className="lib-state">No hay generaciones que coincidan.</p>}
 
       {items.length > 0 && (view === 'grid'
-        ? <div className="lib-grid">{items.map((g) => <Card key={g.id} g={g} onFav={onFav} />)}</div>
+        ? (
+          <VirtualGrid items={items} rowHeight={CARD_ROW_HEIGHT} gap={CARD_GAP} minColumnWidth={CARD_MIN_WIDTH}
+            renderRow={(row, _i, columns) => (
+              <div style={{ display: 'grid', gridTemplateColumns: `repeat(${columns}, 1fr)`, gap: CARD_GAP }}>
+                {row.map((g) => <Card key={g.id} g={g} onFav={onFav} />)}
+              </div>
+            )} />
+        )
         : <ListView items={items} onFav={onFav} />)}
 
       <div ref={sentinel} style={{ height: 1 }} />

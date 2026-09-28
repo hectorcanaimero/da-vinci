@@ -1,6 +1,7 @@
 import type { CSSProperties, MouseEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { fileUrl, setFavorite } from '../../api';
+import VirtualGrid from '../../components/VirtualGrid';
 import type { Generation } from '../../types';
 import { relTime } from './Card';
 import { KIND_LABEL } from './Filters';
@@ -8,6 +9,8 @@ import { KIND_LABEL } from './Filters';
 const ICON: Record<string, string> = { audio: '🎵', sfx: '🔊', 'model-3d': '🧊' };
 const basename = (p: string) => p.slice(p.lastIndexOf('/') + 1) || p;
 const usd = (n: number) => `$${n.toFixed(3)}`;
+const ROW_HEIGHT = 53;
+const COLS = 8;
 
 export default function ListView({ items, onFav }: {
   items: Generation[];
@@ -35,8 +38,8 @@ export default function ListView({ items, onFav }: {
           <th style={{ ...th, width: 40 }} />
         </tr>
       </thead>
-      <tbody>
-        {items.map((g) => (
+      <VirtualGrid items={items} as="tbody" rowHeight={ROW_HEIGHT} placeholderColSpan={COLS}
+        renderRow={([g]) => (
           <tr key={g.id} style={row} tabIndex={0} onClick={() => nav(`/asset/${g.id}`)}
             onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) nav(`/asset/${g.id}`); }}>
             <td style={td}>
@@ -61,8 +64,7 @@ export default function ListView({ items, onFav }: {
               </button>
             </td>
           </tr>
-        ))}
-      </tbody>
+        )} />
     </table>
   );
 }
