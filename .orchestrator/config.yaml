@@ -6,7 +6,7 @@ concurrency:
   global_max: 8
   # Per-backend caps (FR-D-5). AS-05 verifies claude cap holds.
   per_provider:
-    claude: 3
+    claude: 5
     codex: 2
     opencode: 3
     gemini: 2
@@ -113,6 +113,7 @@ tunnel:
 dispatch:
   worktree_mode: true    # on by default — set to false to run agents in-place
   base_branch: main      # branch new worktrees are based on
+  worktree_setup: npm --prefix ui ci   # v0.16.0 — corre en cada worktree nuevo; ui/ tiene deps, el root no
 
 # Sprint F-4 — VCS integration (PR automation + CI polling).
 # Requires dispatch.worktree_mode: true to have any effect.

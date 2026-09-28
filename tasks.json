@@ -1,8 +1,8 @@
 {
   "meta": {
     "project": "da-vinci",
-    "generatedAt": "2026-09-25",
-    "note": "Skeleton created by `orch init`. Add tasks by editing this file directly OR by writing specs under specs/ and running `orch atomize --file specs/YOUR-SPEC.md --apply`."
+    "generatedAt": "2026-09-28",
+    "note": "Vaciado al cerrar el PRD 001 (entregado en main). Las tareas entran por orch atomize desde specs/."
   },
   "phases": [
     {
@@ -14,548 +14,807 @@
     {
       "id": "F1.1.T1",
       "phase": 1,
-      "title": "Errores y catálogo de modelos",
-      "description": "Crear `src/core/errors.mjs` y `src/core/catalog.mjs` exactamente con las\nfirmas de *Interfaces → Núcleo (JS)* de docs/arch/001-studio.md.\n\n`errors.mjs`: clase `DavinciError` (`code`, `status`, `details`) con los\ncódigos y status HTTP listados en la arquitectura, y\n`classifyProviderError(err)` que traduce los `Error` que hoy lanzan\n`src/providers/*.mjs`: \"no configurada\" → `provider_unavailable`; `(401)`,\n`(403)`, `(429)`, `(5xx)` en el mensaje → `provider_error`; `(400)`, `(422)`\n→ `provider_rejected`; \"timeout\" o \"FAILED\"/\"failed\" de polling →\n`provider_rejected` (no se reintenta: el proveedor ya aceptó el trabajo, ver\ndecisión D9). Un `DavinciError` pasa sin cambios.\n\n`catalog.mjs`: `MODELS` con una entrada por cada modelo que hoy soporta\n`src/generate.mjs` (image por fal/openai/gemini/kie/heygen, svg recraft,\nvideo fal/gemini/kie, model-3d tripo, avatar-video heygen, audio y sfx\nelevenlabs, bg-remove, upscale clarity/real-esrgan). `costKey(params)`\nreproduce exactamente la lógica actual de `costKey()` y de cada `run*` en\n`src/generate.mjs` (quality solo para openai, `:\u003cduration\u003es` en video,\n`:textured` en tripo, `tts` vs `tts-turbo` según modelo). `equivalent` agrupa\nmodelos intercambiables entre proveedores (al menos: veo-3-fast\ngemini↔kie, veo-3 gemini↔kie, kling-2.1 fal↔kie, flux-2 kie↔fal si existe).\n`defaultModel(kind)` = defaults actuales (`flux-pro-ultra`, `kling-1.6-pro`,\n`recraft-v3-svg`, etc.). No duplicar precios: leer `COST_TABLE`.\n\nDone when: `node --test test/catalog.test.mjs` pasa y cubre: cada\n`costKey` de un modelo del catálogo existe en `COST_TABLE` (o está marcado\ncomo desconocido a propósito), `defaultModel` por cada kind, `equivalents`\nde veo-3-fast, y la clasificación de 6 mensajes de error reales copiados de\nlos providers.",
+      "title": "Proyecto src-tauri, ventana y superficie de comandos",
+      "description": "Crear el proyecto Tauri v2 en `src-tauri/` según la sección *Components →\ntauri/shell* de `docs/arch/002-reveron-desktop.md`.\n\n`main.rs` es un pasamanos de tres líneas que llama a `app_lib::run()`. Toda la\nlógica va en `lib.rs` con `#[cfg_attr(mobile, tauri::mobile_entry_point)]` sobre\n`pub fn run()`. El `Cargo.toml` lleva la sección `[lib]` con\n`crate-type = [\"staticlib\", \"cdylib\", \"rlib\"]`.\n\nConfigurar en `tauri.conf.json`: `build.devUrl` apuntando al servidor de\ndesarrollo de Vite, `build.frontendDist` a `../dist/ui`, ventana con tamaño\nmínimo de 1024×700 (NFR del FR-4), y el empaquetado con `externalBin` y\n`resources` como los fija la sección *Interfaces → Empaquetado*.\n\n**Lo más importante de esta tarea**: `lib.rs` tiene que declarar desde ya los\ncuatro módulos (`sidecar`, `secrets`, `agent`, `platform`), crear sus archivos\nvacíos, y registrar en `tauri::generate_handler![]` **todos** los comandos que\nlista la sección *Interfaces → Comandos Tauri*, cada uno como un stub que\ndevuelve `Err(\"no implementado\")`. Las tareas posteriores editan sólo su propio\nmódulo y nunca vuelven a tocar `lib.rs`; si los comandos no quedan registrados\nacá, cada tarea siguiente colisiona con las demás en el mismo archivo.\n\nLa capability `default.json` arranca con `core:default` y nada más. **No\nincluir `shell:allow-execute`** — la decisión D8 del arch prohíbe que la webview\nejecute procesos.\n\nDone when: `cargo build` compila, `npx tauri info` reporta Tauri v2, la ventana\nabre con el tamaño mínimo respetado, y llamar a cualquier comando desde la\nconsola del webview devuelve el error de no implementado en vez de \"command not\nfound\".",
       "model": "claude/claude-sonnet-5",
-      "reason": "Tablas y mapeo cuidadoso de lógica existente; tier estándar.",
+      "reason": "Configuración y andamiaje con patrones conocidos, pero la superficie de comandos tiene que quedar exacta porque toda la fase cuelga de ella.",
+      "status": "backlog",
+      "dependencies": [],
+      "estimateHours": 4.0,
+      "files": [
+        "src-tauri/Cargo.toml",
+        "src-tauri/build.rs",
+        "src-tauri/tauri.conf.json",
+        "src-tauri/capabilities/default.json",
+        "src-tauri/src/main.rs",
+        "src-tauri/src/lib.rs",
+        "src-tauri/src/sidecar.rs",
+        "src-tauri/src/secrets.rs",
+        "src-tauri/src/agent.rs",
+        "src-tauri/src/platform.rs",
+        ".gitignore"
+      ],
+      "specRef": "f1-app-abre.md#F1.1.T1",
+      "comments": []
+    },
+    {
+      "id": "F1.2.T1",
+      "phase": 1,
+      "title": "Handshake, puerto dinámico y apagado por stdin",
+      "description": "Modificar el arranque del servidor Node para que cumpla el contrato de la\nsección *Interfaces → Sidecar ↔ servidor Node* de\n`docs/arch/002-reveron-desktop.md`.\n\nTres cambios sobre `src/server/start.mjs`, más un punto de entrada\n`src/server/cli.mjs` que el sidecar invoca directo:\n\n1. Al quedar escuchando, imprimir en stdout **una sola línea** de JSON\n   `{\"event\":\"ready\",\"port\":\u003cn\u003e,\"url\":\"http://127.0.0.1:\u003cn\u003e\"}` y nada antes de\n   ella. Hoy imprime texto en castellano; ese texto pasa a stderr.\n2. Aceptar `--port 0` para pedir un puerto libre al sistema. El puerto real\n   sale del handshake, que es de donde el sidecar lo lee (FR-44).\n3. Con la variable de entorno `REVERON_PARENT=1`, registrar un manejador sobre\n   `process.stdin` que cierre el servidor cuando stdin se cierre. Es la segunda\n   defensa de la decisión D10 contra servidores huérfanos.\n\nNo cambiar nada más del servidor: las rutas, la cola y la autenticación quedan\ncomo están.\n\nDone when: un test de `node --test` arranca el servidor con `--port 0`, parsea\nla primera línea de stdout como JSON, verifica que el puerto anunciado responde\n`GET /api/health`, cierra stdin y comprueba que el proceso termina solo.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Cambio acotado sobre código existente, pero es el contrato del que depende todo el arranque de la app.",
       "status": "backlog",
       "dependencies": [],
       "estimateHours": 3.0,
       "files": [
-        "src/core/errors.mjs",
-        "src/core/catalog.mjs",
-        "test/catalog.test.mjs"
+        "src/server/start.mjs",
+        "src/server/cli.mjs",
+        "test/server-handshake.test.mjs"
       ],
-      "specRef": "f1-biblioteca.md#F1.1.T1",
+      "specRef": "f1-app-abre.md#F1.2.T1",
       "comments": []
     },
     {
-      "id": "F1.1.T2",
+      "id": "F1.3.T1",
       "phase": 1,
-      "title": "generate() y storage",
-      "description": "Mover la lógica de los handlers `runImage`, `runSvg`, `runVideo`,\n`runModel3d`, `runAvatarVideo`, `runTts`, `runSfx`, `runBgRemove`,\n`runUpscale` de `src/generate.mjs` a\n`generate(entry, req, ctx): Promise\u003cGenerationOutput[]\u003e` en\n`src/core/generate.mjs`, y los helpers `saveRemoteAsset`, `saveB64Asset`,\n`saveBufferAsset`, `downloadWithMime`, `MIME_TO_EXT`, `timestamp` a\n`src/core/storage.mjs`. Firmas y tipos en *Interfaces → Núcleo (JS)*.\n\nDiferencias con el código actual, a propósito:\n- No hay `process.exit`, ni gate de costo, ni registro: solo proveedor +\n  guardado. Errores de proveedor se relanzan con `classifyProviderError`.\n- Inputs: `req.inputs` (`{id}`, `{url}`, `{path}`) se resuelven con\n  `utils/reference-loader.mjs`; `{id}` se resuelve con una función\n  `resolveInputPath(id)` que llega en `ctx` (la inyecta el router; en tests\n  se mockea). bg-remove y upscale aceptan también inputs locales, pasando\n  data URL a FAL.\n- `n \u003e 1`: se guardan todos los archivos, `-1`, `-2`… en el nombre, y se\n  devuelven todos los outputs.\n- Directorio: `ctx.outPath` si viene (solo con un output), si no\n  `ctx.outDir`.\n\n`src/generate.mjs` NO se modifica en esta tarea (lo hace F1.4.T2).\n\nDone when: `node --test test/core.test.mjs` pasa con `fetch` mockeado y\ncubre: image fal con n=2 (dos archivos), image openai b64, video gemini con\ninput `{path}`, tts con buffer, un 401 que sale como\n`DavinciError{code:'provider_error'}`.",
+      "title": "Descarga del binario de Node por plataforma",
+      "description": "Escribir `scripts/fetch-node.mjs`: descarga el binario oficial de Node para el\ntriple que se le pida y lo deja en `src-tauri/binaries/node-\u003ctriple\u003e` (con\n`.exe` en Windows), que es el nombre que exige la convención de `externalBin`\nde Tauri.\n\nTriples a soportar: `aarch64-apple-darwin`, `x86_64-apple-darwin`,\n`x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`.\n\nLa versión de Node se fija en una constante del script y tiene que ser ≥22.13,\nporque el servidor usa `node:sqlite`. Verificar la descarga contra el\n`SHASUMS256.txt` que publica Node; una descarga que no valida aborta sin dejar\nel archivo a medias. Si el binario ya está y su hash coincide, no re-descargar.\n`src-tauri/binaries/` va al `.gitignore`.\n\nDone when: `node scripts/fetch-node.mjs --target aarch64-apple-darwin` deja un\nbinario ejecutable cuyo `--version` reporta la versión esperada, y correrlo dos\nveces seguidas no vuelve a descargar.",
+      "model": "claude/claude-haiku-4-5",
+      "reason": "Script mecánico de descarga y verificación de hash, sin decisiones de diseño.",
+      "status": "backlog",
+      "dependencies": [],
+      "estimateHours": 2.0,
+      "files": [
+        "scripts/fetch-node.mjs",
+        "src-tauri/binaries/.gitkeep"
+      ],
+      "specRef": "f1-app-abre.md#F1.3.T1",
+      "comments": []
+    },
+    {
+      "id": "F1.3.T2",
+      "phase": 1,
+      "title": "Arranque del sidecar y muerte garantizada",
+      "description": "Implementar `src-tauri/src/sidecar.rs` según *Components → tauri/sidecar* y\n*Interfaces → Sidecar ↔ servidor Node* del arch.\n\nEn el `setup` de la app: resolver el binario de Node empaquetado y el directorio\nde recursos con `app.path()`, lanzar `node \u003crecursos\u003e/src/server/cli.mjs\n--port 0 --host 127.0.0.1` con `DAVINCI_HOME` apuntando a `~/.reveron` y\n`REVERON_PARENT=1`, leer la línea de handshake de stdout y quedarse con el\npuerto. Si no llega en 10 segundos, el arranque falla con un error que la\ninterfaz pueda mostrar (NFR-13: un fallo del servidor no cierra la app).\n\nEl proceso se lanza **desde Rust**, no desde la webview: la decisión D8 prohíbe\ndarle permiso de shell al frontend, así que acá no se usa el plugin de shell\nexpuesto sino el spawn del lado de Rust.\n\nLa muerte del sidecar es la primera defensa de D10: matar el proceso en\n`RunEvent::Exit`. La segunda ya la trae F1.2.T1 por stdin.\n\nDone when: la app abre y el webview carga contra el puerto que anunció el\nhandshake; y matando la app a la fuerza (`kill -9` al proceso padre) no queda\nningún proceso escuchando ese puerto — verificado en un test de integración o,\nsi no es automatizable en CI, documentado como comprobación manual en el propio\narchivo con el comando exacto.",
+      "model": "claude/opus",
+      "reason": "Ciclo de vida de procesos entre dos runtimes; un error acá deja servidores huérfanos con las llaves del usuario en memoria.",
+      "status": "backlog",
+      "dependencies": [
+        "F1.1.T1",
+        "F1.2.T1",
+        "F1.3.T1"
+      ],
+      "estimateHours": 4.0,
+      "files": [
+        "src-tauri/src/sidecar.rs"
+      ],
+      "specRef": "f1-app-abre.md#F1.3.T2",
+      "comments": []
+    },
+    {
+      "id": "F1.3.T3",
+      "phase": 1,
+      "title": "Estado, reinicio y detención del servidor",
+      "description": "Completar en `src-tauri/src/sidecar.rs` los tres comandos que `lib.rs` ya tiene\nregistrados: `server_status`, `server_restart` y `server_stop` (FR-45).\n\n`server_status` devuelve puerto, pid, si está vivo y hace cuánto arrancó — es\nlo que el panel lateral muestra permanentemente (FR-5). `server_restart` mata y\nvuelve a lanzar reusando el arranque de F1.3.T2. `server_stop` lo deja detenido\ny el estado pasa a caído sin cerrar la app.\n\nDone when: los tres comandos responden desde el webview, reiniciar deja un\npuerto funcional otra vez, y detener deja `server_status` reportando caído con\nla app todavía abierta y navegable.",
       "model": "claude/claude-sonnet-5",
-      "reason": "Refactor mecánico pero extenso; el contrato ya está fijado.",
+      "reason": "Extiende el ciclo de vida que ya dejó resuelto la tarea anterior.",
+      "status": "backlog",
+      "dependencies": [
+        "F1.3.T2"
+      ],
+      "estimateHours": 2.5,
+      "files": [
+        "src-tauri/src/sidecar.rs"
+      ],
+      "specRef": "f1-app-abre.md#F1.3.T3",
+      "comments": []
+    },
+    {
+      "id": "F1.4.T1",
+      "phase": 1,
+      "title": "Tokens del diseño y tipografías embebidas",
+      "description": "Llevar el sistema visual de `docs/layout.pen` a CSS. Los valores exactos están\nen las variables del archivo de diseño y son estos:\n\nFondos `#12110E` (app), `#1A1815` (superficie), `#232019` (elevado), `#0E0D0B`\n(campos). Bordes `#302B23` y `#221F1A`. Texto `#F3EEE2` (primario), `#A49D8F`\n(secundario), `#6B6559` (apagado). Acento `#C0693A` y `#3A2318`. Hueso\n`#E6DBC2`. Estados: `#7E9E6A` ok, `#D2A44B` advertencia, `#C0553F` peligro.\n\nTipografías: Fraunces para títulos y la marca, Inter para toda la interfaz,\nJetBrains Mono para datos (rutas, modelos, costos, identificadores).\n\nLas tres se descargan y se sirven desde `ui/public/fonts/` con `@font-face`:\nel NFR-8 prohíbe pedirle recursos a ningún servidor externo para renderizar.\nIncluir sólo los pesos que el diseño usa, en `woff2`.\n\nDefinir los tokens en `:root` y dejar preparado el atributo de tema en el\nelemento raíz, aunque sólo el tema oscuro tenga valores por ahora — el A7 del\nPRD reconoce que los otros dos son deuda de diseño.\n\nDone when: una página de prueba muestra las tres tipografías cargadas desde\ndisco sin ninguna petición externa (verificable en la pestaña de red del\ninspector), y cada token está definido una sola vez y referenciado por nombre.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Trabajo de CSS con valores ya fijados, pero es la base que todas las pantallas reusan.",
+      "status": "backlog",
+      "dependencies": [],
+      "estimateHours": 3.0,
+      "files": [
+        "ui/src/styles/tokens.css",
+        "ui/src/styles.css",
+        "ui/index.html",
+        "ui/public/fonts/.gitkeep"
+      ],
+      "specRef": "f1-app-abre.md#F1.4.T1",
+      "comments": []
+    },
+    {
+      "id": "F1.5.T1",
+      "phase": 1,
+      "title": "Barra de título por plataforma",
+      "description": "Implementar la barra de título que pide el FR-3 siguiendo la decisión D9 del\narch: en macOS `titleBarStyle: \"Overlay\"` para conservar los semáforos nativos\nsuperpuestos sobre nuestra barra; en Windows y Linux `decorations: false` con\ncontroles propios de minimizar, maximizar y cerrar **a la derecha**.\n\nDel lado de Rust, `platform.rs` implementa `platform_info()`, que devuelve el\nsistema operativo y el nombre de la tecla modificadora que la interfaz muestra\n—`⌘` en macOS, `Ctrl` en el resto— porque el FR-40 lo exige en toda la app.\n\nLa barra tiene 38 px de alto, arrastra la ventana y muestra el título centrado,\ncomo en `docs/layout.pen`.\n\nDone when: la app abre en los tres sistemas con los controles en el lado que\ncorresponde, arrastrar la barra mueve la ventana, y `platform_info()` devuelve\nel modificador correcto.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Diferencias reales entre sistemas operativos que hay que probar en los tres.",
+      "status": "backlog",
+      "dependencies": [
+        "F1.1.T1",
+        "F1.4.T1"
+      ],
+      "estimateHours": 3.5,
+      "files": [
+        "ui/src/components/Titlebar.tsx",
+        "src-tauri/src/platform.rs"
+      ],
+      "specRef": "f1-app-abre.md#F1.5.T1",
+      "comments": []
+    },
+    {
+      "id": "F1.5.T2",
+      "phase": 1,
+      "title": "Panel lateral y enrutado entre pantallas",
+      "description": "Construir el panel lateral de 240 px que define `docs/layout.pen` y el enrutado\nentre las seis pantallas principales.\n\nEl panel lleva la marca, la navegación de seis destinos (Chat, Estudio,\nGalería, Actividad, Gastos, Ajustes) con contadores y avisos, el bloque de\nestado de proveedores, y al pie la fila del servidor: indicador de vivo,\ndirección, y gasto del día contra el tope. Esa fila cumple el FR-5 y tiene que\nverse en **todas** las pantallas, así que vive en el layout y no en cada una.\n\nEl estado del servidor sale de `server_status` (F1.3.T3); el gasto, de\n`GET /api/spend` que ya existe. Cada destino renderiza por ahora un marcador de\nposición con su título.\n\nReusar el enrutado de react-router que `ui/src/App.tsx` ya tiene; no agregar\ndependencias nuevas.\n\nDone when: las seis pantallas son alcanzables, el pie del panel muestra estado\nreal del servidor y gasto real, y a 1024 px de ancho no hay barrido horizontal\n(FR-4).",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Layout que todas las pantallas heredan; el pie con estado en vivo tiene que quedar bien una sola vez.",
+      "status": "backlog",
+      "dependencies": [
+        "F1.3.T3",
+        "F1.4.T1"
+      ],
+      "estimateHours": 4.0,
+      "files": [
+        "ui/src/components/Sidebar.tsx",
+        "ui/src/components/Layout.tsx",
+        "ui/src/App.tsx"
+      ],
+      "specRef": "f1-app-abre.md#F1.5.T2",
+      "comments": []
+    },
+    {
+      "id": "F2.1.T1",
+      "phase": 2,
+      "title": "Llavero del sistema con respaldo a archivo",
+      "description": "Implementar `src-tauri/src/secrets.rs` según *Components → tauri/secrets* y la\ndecisión D3 de `docs/arch/002-reveron-desktop.md`.\n\nUsar el crate `keyring` contra el servicio `reveron`, una entrada por proveedor\nnombrada con su variable (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `FAL_API_KEY`,\n`KIE_API_KEY`, `HEYGEN_API_KEY`, `ELEVENLABS_API_KEY`, `TRIPO_API_KEY`).\n\nCuando el llavero no está disponible —típicamente un Linux sin servicio de\nsecretos— caer a `~/.config/reveron/.env` creado con permisos `600`. Esa ruta\nya la sabe leer `src/utils/secrets.mjs`, así que el respaldo no requiere tocar\nel lado de Node. El origen efectivo de cada llave es parte de lo que se\nreporta (FR-9).\n\nCompletar los comandos `secrets_list`, `secrets_set` y `secrets_delete` que\n`lib.rs` ya tiene registrados. `secrets_list` devuelve por proveedor: si hay\nllave, los últimos cuatro caracteres, y de dónde salió. **Nunca devolver la\nllave completa al frontend.**\n\nDone when: guardar, listar y borrar funciona en el llavero nativo; forzando la\nausencia de llavero, lo mismo funciona contra el archivo con permisos `600`; y\nningún comando expone una llave entera.",
+      "model": "claude/opus",
+      "reason": "Manejo de credenciales con tres implementaciones de sistema operativo detrás y un camino de respaldo; un error acá filtra llaves.",
       "status": "backlog",
       "dependencies": [
         "F1.1.T1"
       ],
       "estimateHours": 4.0,
       "files": [
-        "src/core/generate.mjs",
-        "src/core/storage.mjs",
-        "test/core.test.mjs"
+        "src-tauri/src/secrets.rs"
       ],
-      "specRef": "f1-biblioteca.md#F1.1.T2",
-      "comments": []
-    },
-    {
-      "id": "F1.2.T1",
-      "phase": 1,
-      "title": "Config y Library",
-      "description": "Crear `src/core/config.mjs`: resuelve `home` (`DAVINCI_HOME` o\n`~/.davinci`), lee `\u003chome\u003e/config.json` fusionando con los defaults de\n*Interfaces → Configuración* y exporta `loadConfig()` y `saveConfig(patch)`.\n\nCrear `src/library/db.mjs` con `openLibrary(home)` e implementar la interfaz\n`Library` completa de *Interfaces → Núcleo (JS)*, incluido `jobs`, sobre\n`node:sqlite` (`DatabaseSync`). Esquema exacto de *Data model*; migraciones\ncomo lista ordenada aplicada según `PRAGMA user_version`. Al abrir:\n`journal_mode=WAL`, `busy_timeout=5000`, `foreign_keys=ON`. Cada escritura\nes una transacción corta. `list` pagina por cursor opaco (base64 de\n`created_at|id`), `q` busca con `LIKE` sobre `prompt`, excluye borrados.\n`record` resuelve cada input con `resolveInputId` (acepta `davinci:\u003cid\u003e`,\n`/files/\u003cid\u003e`, URL absoluta que termine en `/files/\u003cid\u003e`, o ruta igual a un\n`file_path`). `remove` marca `deleted_at` y, con `deleteFile`, borra el\narchivo. `spend` agrupa por `date(created_at)`, `provider` o `model`.\n`spentToday` usa la fecha local. `jobs.failInterrupted` pasa `queued` y\n`running` a `failed` con error `{code:'interrupted'}`.\n\nSilenciar solo el `ExperimentalWarning` de `node:sqlite` si aparece.\n\nDone when: `node --test test/library.test.mjs` pasa con una home temporal y\ncubre: record + get con inputs vinculados por `davinci:\u003cid\u003e` y por ruta,\nlineage padres/hijos, list con q + kind + cursor (3 páginas), remove sin\nromper el linaje del hijo, spend por provider, jobs + failInterrupted, y dos\n`openLibrary` sobre la misma home escribiendo alternadamente.",
-      "model": "claude/claude-sonnet-5",
-      "reason": "SQL y paginación con contrato claro; estándar alcanza.",
-      "status": "backlog",
-      "dependencies": [],
-      "estimateHours": 4.0,
-      "files": [
-        "src/core/config.mjs",
-        "src/library/db.mjs",
-        "test/library.test.mjs"
-      ],
-      "specRef": "f1-biblioteca.md#F1.2.T1",
-      "comments": []
-    },
-    {
-      "id": "F1.2.T2",
-      "phase": 1,
-      "title": "Import de manifests",
-      "description": "Crear `src/library/import.mjs` con\n`importManifest(path, lib): Promise\u003c{imported, skipped}\u003e` según *Data model →\nImport*: cada entrada se inserta con su `id` original (idempotente),\n`source='import'`, `project_dir` = carpeta dos niveles arriba del manifest,\n`kind` deducido de la extensión (`png|jpg|webp|gif`→image, `svg`→svg,\n`mp4|webm|mov`→video, `mp3|wav|m4a`→audio, `glb`→model-3d; prompt que empieza\ncon `bg-remove`/`upscale` → ese kind), `references` → inputs. Archivos que ya\nno existen se importan igual. Agregar a `Library` lo que haga falta solo como\nuso de su API pública (no editar `db.mjs`; si falta un método, usar\n`record` con el id).\n\nDone when: `node --test test/import.test.mjs` pasa: importar un manifest de\nejemplo con 4 entradas da `imported: 4`, repetir da `imported: 0,\nskipped: 4`, y un video cuya referencia es la ruta de una imagen importada\nqueda con `input_id` de esa imagen.",
-      "model": "claude/claude-sonnet-5",
-      "reason": "Transformación de datos simple.",
-      "status": "backlog",
-      "dependencies": [
-        "F1.2.T1"
-      ],
-      "estimateHours": 2.0,
-      "files": [
-        "src/library/import.mjs",
-        "test/import.test.mjs"
-      ],
-      "specRef": "f1-biblioteca.md#F1.2.T2",
-      "comments": []
-    },
-    {
-      "id": "F1.3.T1",
-      "phase": 1,
-      "title": "Lockfile y escritura atómica",
-      "description": "En `src/utils/manifest.mjs`, hacer que `recordGeneration` sea seguro entre\nprocesos: tomar `manifest.json.lock` con `open(..., 'wx')`, reintentar con\nespera corta hasta 10 s, considerar huérfano un lock de más de 30 s,\nleer-modificar-escribir a `manifest.json.tmp-\u003cpid\u003e` y `rename`, soltar el\nlock en `finally`. El formato del archivo y las firmas exportadas no\ncambian. Aceptar un `entry.id` opcional (si viene, usarlo en vez de generar\nuno), porque el router registrará el mismo id en la biblioteca y el\nmanifest.\n\nDone when: `node --test test/manifest.test.mjs` pasa: 10 procesos hijos\n(`child_process.fork`) llaman a `recordGeneration` a la vez sobre el mismo\ndirectorio y el manifest termina con 10 entradas y JSON válido; un\n`entry.id` dado se respeta.",
-      "model": "claude/claude-sonnet-5",
-      "reason": "Concurrencia de archivos acotada.",
-      "status": "backlog",
-      "dependencies": [],
-      "estimateHours": 2.0,
-      "files": [
-        "src/utils/manifest.mjs",
-        "test/manifest.test.mjs"
-      ],
-      "specRef": "f1-biblioteca.md#F1.3.T1",
-      "comments": []
-    },
-    {
-      "id": "F1.4.T1",
-      "phase": 1,
-      "title": "core/router",
-      "description": "Crear `src/core/router.mjs` con `estimate(req)` y `run(req, ctx)` según\n*Interfaces → Núcleo (JS)* y *Components → core/router*:\n\n1. Resolver el modelo: `auto`/vacío → `defaultModel(kind)`; id desconocido →\n   `invalid_request`. Validar campos requeridos por kind (prompt, text,\n   script+avatar+voice…) → `invalid_request`.\n2. Candidatos: el pedido + `equivalents(id)` si `req.fallback !== false` y\n   `config.fallback`.\n3. Gate: `estimateCost` con los umbrales de config; `confirm` sin\n   `req.confirm` → `cost_confirm_required` (details con costo). Si\n   `dailyBudgetUsd` y `spentToday()+costo` lo supera → `budget_exceeded`\n   (no lo salta `confirm`).\n4. Ejecutar `generate()` por candidato; ante `provider_unavailable` o\n   `provider_error` pasar al siguiente; ante cualquier otro error, lanzar.\n   Si todos fallan, lanzar el último error.\n5. Registrar cada output en la biblioteca (`record`, con `requested_model`\n   si hubo fallback, `source`, `project_dir`, `params`, inputs) y, si\n   `ctx.projectDir`, también en su `manifest.json` con el mismo id.\n6. Devolver `Generation[]`.\n\nLa biblioteca y config se obtienen por defecto con `openLibrary()` /\n`loadConfig()`, pero `run`/`estimate` aceptan `ctx.library` para tests.\n`ctx.resolveInputPath` para `generate` se construye con `library.get`.\n\nDone when: `node --test test/router.test.mjs` pasa con `generate` y\nbiblioteca reales sobre home temporal y `fetch` mockeado: auto elige el\ndefault, costo alto sin confirm lanza 402, tope diario lanza\n`budget_exceeded`, un 401 de gemini hace fallback a kie y registra\n`provider: 'kie'` + `requested_model`, un 422 no hace fallback, y con\n`projectDir` el manifest y la biblioteca comparten id.",
-      "model": "claude/opus",
-      "reason": "Punto central de gasto y fallback; errores aquí cuestan dinero real.",
-      "status": "backlog",
-      "dependencies": [
-        "F1.1.T2",
-        "F1.2.T1",
-        "F1.3.T1"
-      ],
-      "estimateHours": 4.0,
-      "files": [
-        "src/core/router.mjs",
-        "test/router.test.mjs"
-      ],
-      "specRef": "f1-biblioteca.md#F1.4.T1",
-      "comments": []
-    },
-    {
-      "id": "F1.4.T2",
-      "phase": 1,
-      "title": "CLI como capa fina",
-      "description": "Reescribir `src/generate.mjs` para que use `core/router`: flags →\n`GenerationRequest` (`--provider X --model Y` → `model: 'X/Y'`; solo\n`--provider` → default de ese proveedor; nada → `auto`), `ctx = { source:\n'cli', projectDir: cwd, outDir: \u003ccwd\u003e/assets/generated, outPath: --out }`.\nConservar exactamente: todos los flags, `--help`, `--dry-run` (imprime el\nmismo JSON de hoy usando `estimate`), el mensaje de costo por stderr,\n`--force` → `confirm: true`, código de salida 2 en\n`cost_confirm_required`, `list-voices` y `list-avatars`, y el JSON de éxito\n(`ok, id, provider, model, outputPath, costUsd, manifestPath`; con n\u003e1,\nimprimir uno por output). `--refs` acepta además `davinci:\u003cid\u003e`.\nNuevo subcomando `import \u003cruta-a-manifest.json\u003e` que usa `importManifest` e\nimprime `{imported, skipped}`. `--help` los documenta.\n\nEn `package.json`: `engines.node` → `\u003e=22.13.0`, script `\"test\": \"node\n--test test/*.test.mjs\"` (no `test/` a secas: en Node 24 falla), y `lint` incluye `src/core/*.mjs src/library/*.mjs`.\n\nDone when: `npm test` pasa entero, e incluye `test/cli.test.mjs` que corre\nel CLI como proceso hijo con un `--import` de un módulo que mockea `fetch`\ny `DAVINCI_HOME` temporal: `image --dry-run`, `image` fal (JSON de salida\ncon el mismo shape y fila en la biblioteca), costo alto sin `--force` → exit\n2, `--refs davinci:\u003cid\u003e` vincula el padre, `import` dos veces es idempotente.",
-      "model": "claude/claude-sonnet-5",
-      "reason": "Cableado con compatibilidad estricta; el diseño ya está resuelto.",
-      "status": "backlog",
-      "dependencies": [
-        "F1.4.T1",
-        "F1.2.T2"
-      ],
-      "estimateHours": 3.0,
-      "files": [
-        "src/generate.mjs",
-        "package.json",
-        "test/cli.test.mjs",
-        "test/helpers/mock-fetch.mjs"
-      ],
-      "specRef": "f1-biblioteca.md#F1.4.T2",
-      "comments": []
-    },
-    {
-      "id": "F2.1.T1",
-      "phase": 2,
-      "title": "Servidor HTTP base",
-      "description": "Crear el esqueleto del servidor:\n\n- `src/server/http.mjs`: tabla de rutas mínima (`method`, patrón con\n  `:params`), parseo de query y body JSON (límite 25 MB), `sendJson`,\n  `sendError(DavinciError)` con el formato\n  `{error:{code,message,details}}`, 404 JSON para rutas `/api` y `/v1`\n  desconocidas.\n- Auth: si `config.host` no es `127.0.0.1`/`localhost`/`::1`, exigir\n  `Authorization: Bearer \u003cconfig.apiKey\u003e` en `/api/*`, `/v1/*` y\n  `/files/*` (también `?key=` en `/files` y `/api/events`, porque `\u003cimg\u003e` y\n  `EventSource` no mandan headers); sin `apiKey` configurada en ese caso,\n  negarse a arrancar con un mensaje claro.\n- `src/server/events.mjs`: `EventEmitter` compartido y handler de\n  `GET /api/events` (SSE: `event: \u003ctipo\u003e\\ndata: \u003cjson\u003e\\n\\n`, ping cada 25 s,\n  limpieza al cerrar).\n- `src/server/routes/files.mjs`: `GET /files/:id` sirve solo el\n  `file_path` de esa fila (404 si no existe o está borrada), con\n  `Content-Type`, `Content-Length` y soporte de `Range` (206).\n- `src/server/routes/openai.mjs` y `src/server/routes/providers.mjs`: stubs\n  que exportan `routes = []` (los llenan F2.3.T1 y F2.4.T2).\n- `src/server/index.mjs`: `createServer({ config, library, router, jobs })`\n  → `http.Server`, que monta `routes/*.mjs`, `/api/events` y sirve estáticos\n  de `dist/ui` (si no existe, `/` responde una página HTML mínima que dice\n  que el dashboard no está compilado) con fallback a `index.html` para rutas\n  que no empiezan con `/api`, `/v1` o `/files`. Evitar path traversal en\n  estáticos.\n- `src/server/routes/api.mjs`: stub con `routes = []` y solo\n  `GET /api/health` → `{ok, version}` (lo completa F2.1.T2).\n\nDone when: `node --test test/server.test.mjs` pasa: health responde, ruta\n`/api/x` da 404 JSON, `/files/:id` sirve un archivo registrado con y sin\n`Range`, `/files/\u003cid-borrado\u003e` da 404, un pedido a `/../package.json` no\nescapa de `dist/ui`, con host `0.0.0.0` sin token da 401 y con token 200, y\nun evento emitido llega por SSE.",
-      "model": "claude/claude-sonnet-5",
-      "reason": "HTTP a mano con auth y traversal; estándar con buenos tests.",
-      "status": "backlog",
-      "dependencies": [
-        "F1.4.T2"
-      ],
-      "estimateHours": 4.0,
-      "files": [
-        "src/server/http.mjs",
-        "src/server/events.mjs",
-        "src/server/index.mjs",
-        "src/server/routes/files.mjs",
-        "src/server/routes/api.mjs",
-        "src/server/routes/openai.mjs",
-        "src/server/routes/providers.mjs",
-        "test/server.test.mjs"
-      ],
-      "specRef": "f2-servidor-api.md#F2.1.T1",
+      "specRef": "f2-primera-vez.md#F2.1.T1",
       "comments": []
     },
     {
       "id": "F2.1.T2",
       "phase": 2,
-      "title": "API nativa",
-      "description": "Completar `src/server/routes/api.mjs` con todas las rutas `/api/*` de la\ntabla *Interfaces → HTTP* salvo `/api/providers*` y `/api/events`:\n`models` (con `available` según haya key del proveedor en `process.env`),\n`estimate`, `generations` (valida y corre `router.estimate` antes de\nencolar, así los 402 y 400 salen sincrónicos; luego `jobs.enqueue(req,\n'dashboard'|'api')` según header `X-Davinci-Source`, 202 `{job}`), `jobs`,\n`jobs/:id`, `library` (query → filtro de `Library.list`), `library/:id` (con\n`parents`/`children`), `PATCH` favorito, `DELETE` (con `?file=true`, emite\n`generation.deleted`), `projects`, `spend` (con `totalUsd`), `import`.\nToda `Generation` serializada con `url: '/files/\u003cid\u003e'`.\n\nDone when: `node --test test/api.test.mjs` pasa cubriendo cada ruta al menos\nuna vez, incluyendo: POST generations con costo alto sin confirm → 402 sin\njob creado, POST válido → 202 y luego el job termina `done` con la\ngeneración en `GET /api/library`.",
+      "title": "Inyección de llaves al servidor y rotación en caliente",
+      "description": "Conectar el llavero con el sidecar según la decisión D4 del arch.\n\nAl lanzar el servidor, `sidecar.rs` pide las llaves a `secrets.rs` y las pasa\ncomo variables de entorno del proceso hijo. `src/utils/secrets.mjs` ya trata\n`process.env` como una de sus fuentes, así que el servidor no necesita ningún\ncambio.\n\nPara rotar una llave sin reiniciar: después de escribir el llavero,\n`secrets_set` hace `PUT /api/providers/:id/key` contra el servidor local, que\nya sabe adoptar una llave en caliente. Sólo si esa llamada falla se reinicia el\nsidecar como último recurso.\n\nDone when: arrancando con llaves guardadas, `GET /api/providers` reporta los\nproveedores conectados sin que el usuario haya tocado nada; y guardar una llave\nnueva desde la app hace que el router empiece a proponer sus modelos sin\nreiniciar.",
       "model": "claude/claude-sonnet-5",
-      "reason": "Muchas rutas finas sobre contratos ya definidos.",
+      "reason": "Pegamento entre dos componentes ya escritos, con un camino de respaldo simple.",
       "status": "backlog",
       "dependencies": [
-        "F2.1.T1",
-        "F2.2.T1"
+        "F1.3.T3",
+        "F2.1.T1"
       ],
-      "estimateHours": 4.0,
+      "estimateHours": 2.5,
       "files": [
-        "src/server/routes/api.mjs",
-        "test/api.test.mjs"
+        "src-tauri/src/sidecar.rs"
       ],
-      "specRef": "f2-servidor-api.md#F2.1.T2",
-      "comments": []
-    },
-    {
-      "id": "F2.1.T3",
-      "phase": 2,
-      "title": "Subcomando serve y arranque",
-      "description": "Crear `src/server/start.mjs` con `startServer({ port, host, open, cwd })`:\ncarga config (flags pisan config), abre la biblioteca, `jobs.failInterrupted()`,\nimporta `\u003ccwd\u003e/assets/generated/manifest.json` si existe (silencioso si no),\ncrea la cola y el servidor, escucha, imprime la URL y, salvo `open: false`,\nabre el navegador (`xdg-open`/`open`/`start` según plataforma, sin fallar si\nno hay). Cierra limpio con SIGINT/SIGTERM.\n\nEn `src/generate.mjs`, agregar `serve [--port N] [--host H] [--no-open]`\nque llama a `startServer`, y documentarlo en `--help`.\n\nDone when: `node src/generate.mjs serve --port 0 --no-open` arranca, imprime\nla URL, `GET /api/health` responde, y un job dejado en `running` en la base\naparece como `failed`/`interrupted` tras arrancar (test en\n`test/start.test.mjs` con proceso hijo).",
-      "model": "claude/claude-sonnet-5",
-      "reason": "Cableado de arranque.",
-      "status": "backlog",
-      "dependencies": [
-        "F2.1.T2"
-      ],
-      "estimateHours": 2.0,
-      "files": [
-        "src/server/start.mjs",
-        "src/generate.mjs",
-        "test/start.test.mjs"
-      ],
-      "specRef": "f2-servidor-api.md#F2.1.T3",
+      "specRef": "f2-primera-vez.md#F2.1.T2",
       "comments": []
     },
     {
       "id": "F2.2.T1",
       "phase": 2,
-      "title": "Cola en proceso con persistencia",
-      "description": "Crear `src/server/jobs.mjs` con\n`createJobQueue({ library, router, events, concurrency, outDir })` →\n`{ enqueue(req, source): Job, get(id), list(filter), idle(): Promise }`.\n`enqueue` crea el job `queued` en `library.jobs`, emite `job`, y lo corre\ncuando haya lugar (máximo `concurrency` a la vez, FIFO). Correr = pasar a\n`running` (emite), `router.run(req, { source, outDir, library })`, y al\nterminar `done` con `generationIds` (emite `job` y una `generation` por\nresultado) o `failed` con `{code, message}` (emite `job`). Un error nunca\ntumba la cola. `events` es un `EventEmitter` inyectado; no importar\n`src/server/events.mjs`. `idle()` resuelve cuando no hay nada en cola ni\ncorriendo (para tests).\n\nDone when: `node --test test/jobs.test.mjs` pasa con un `router` falso:\nconcurrencia 2 con 5 jobs nunca corre más de 2 a la vez, un job que lanza\nqueda `failed` y los siguientes corren, los eventos llegan en orden\n`queued→running→done` y el estado queda persistido en la biblioteca.",
+      "title": "Importación idempotente desde Da Vinci",
+      "description": "Escribir `src/library/migrate.mjs` según *Data model → Migración desde Da\nVinci* del arch.\n\nDetectar una instalación previa en `~/.davinci` y contar sus registros sin\nimportar nada (eso alimenta el FR-12). Importar abre la base vieja en sólo\nlectura e inserta en la nueva con `INSERT OR IGNORE` sobre la clave primaria,\nque es un uuid: de ahí sale la idempotencia del FR-14 sin código extra.\n\n**Los archivos no se copian.** Las filas conservan su `file_path` original\napuntando a `~/.davinci/library/`, así que migrar miles de assets no duplica\ngigabytes y el origen queda intacto como exige el FR-13.\n\nDone when: un test de `node --test` arma una base de origen con registros\nconocidos, migra, verifica que aparecen en destino con su prompt, modelo y\ncosto, que los archivos de origen siguen donde estaban, y que correr la\nmigración por segunda vez deja exactamente el mismo conteo.",
       "model": "claude/claude-sonnet-5",
-      "reason": "Concurrencia simple con contrato cerrado.",
+      "reason": "Movimiento de datos del usuario; la idempotencia y no perder el origen son la parte que hay que probar.",
       "status": "backlog",
-      "dependencies": [
-        "F1.4.T1"
-      ],
+      "dependencies": [],
       "estimateHours": 3.0,
       "files": [
-        "src/server/jobs.mjs",
-        "test/jobs.test.mjs"
+        "src/library/migrate.mjs",
+        "test/migrate.test.mjs"
       ],
-      "specRef": "f2-servidor-api.md#F2.2.T1",
+      "specRef": "f2-primera-vez.md#F2.2.T1",
+      "comments": []
+    },
+    {
+      "id": "F2.2.T2",
+      "phase": 2,
+      "title": "Rutas de migración",
+      "description": "Exponer la migración por HTTP: `GET /api/migration` devuelve si se detectó una\ninstalación previa y cuántos registros tiene; `POST /api/migration/run` la\nejecuta y devuelve cuántos importó. Ambas rutas están declaradas en *Interfaces\n→ HTTP* del arch.\n\nDone when: con una instalación de Da Vinci presente, la ruta de consulta\ndevuelve el conteo real, y la de ejecución importa y responde el número de\nregistros nuevos; sin instalación previa, la consulta responde que no hay nada\nque migrar en vez de fallar.",
+      "model": "claude/claude-haiku-4-5",
+      "reason": "Dos rutas sobre una función ya escrita, siguiendo el patrón del resto del servidor.",
+      "status": "backlog",
+      "dependencies": [
+        "F2.2.T1"
+      ],
+      "estimateHours": 1.5,
+      "files": [
+        "src/server/routes/api.mjs"
+      ],
+      "specRef": "f2-primera-vez.md#F2.2.T2",
       "comments": []
     },
     {
       "id": "F2.3.T1",
       "phase": 2,
-      "title": "/v1/models y /v1/images/generations",
-      "description": "Llenar `src/server/routes/openai.mjs` según *Interfaces → HTTP* (filas\n`/v1`): `GET /v1/models` lista los modelos del catálogo de kind `image` y\n`svg` en formato OpenAI. `POST /v1/images/generations` recibe\n`{model, prompt, n, size, response_format}`, traduce `size`→`aspect`,\n`X-Davinci-Confirm: true`→`confirm`, encola con source `api`, espera a que\nel job termine (sin timeout propio) y responde\n`{created, data:[{url}]}` con URL absoluta según el header `Host`, o\n`b64_json` si se pidió. Errores en formato OpenAI:\n`{error:{message, type, code}}` con el mismo status.\n\nDone when: `node --test test/openai.test.mjs` pasa usando el SDK HTTP a mano\n(fetch) con la forma exacta del SDK de OpenAI: genera con\n`fal/flux-schnell` y la URL devuelta descarga el archivo; `b64_json`\nfunciona; modelo desconocido → 400 formato OpenAI; costo alto sin header →\n402.",
+      "title": "Lista de proveedores con prueba de conexión",
+      "description": "Construir `ui/src/components/ProviderList.tsx`, el componente compartido que\nmuestra los siete proveedores con su estado y permite pegar, probar y rotar una\nllave. Lo usan tanto el onboarding (F2.3.T2) como Ajustes (F6.4.T1), así que\nvive en `components/` y no dentro de una pantalla.\n\nPor proveedor: inicial, nombre, modelos que habilita, campo de llave enmascarado\ncon los últimos cuatro caracteres visibles, estado —conectado, sin llave, error—\ny acción de probar. El estado sale de `GET /api/providers`; la prueba, de\n`POST /api/providers/:id/test`; guardar, del comando `secrets_set`.\n\nDone when: pegar una llave válida deja el proveedor en conectado y sus modelos\ndisponibles en el router; una llave inválida lo deja en error con el mensaje del\nproveedor; y en ningún momento se muestra una llave completa.",
       "model": "claude/claude-sonnet-5",
-      "reason": "Adaptador de formato sobre piezas existentes.",
+      "reason": "Componente reusado por dos pantallas, con estados de error que tienen que ser claros.",
       "status": "backlog",
       "dependencies": [
-        "F2.1.T2"
+        "F2.1.T2",
+        "F1.5.T2"
       ],
-      "estimateHours": 3.0,
+      "estimateHours": 3.5,
       "files": [
-        "src/server/routes/openai.mjs",
-        "test/openai.test.mjs"
+        "ui/src/components/ProviderList.tsx"
       ],
-      "specRef": "f2-servidor-api.md#F2.3.T1",
+      "specRef": "f2-primera-vez.md#F2.3.T1",
       "comments": []
     },
     {
-      "id": "F2.4.T1",
+      "id": "F2.3.T2",
       "phase": 2,
-      "title": "Estado y keys de proveedores",
-      "description": "Crear `src/core/providers-status.mjs`: por cada proveedor (openai, gemini,\nfal, kie, heygen, elevenlabs, tripo) → `{ id, status, source, keyHint,\nerror? }`. `source` sale de dónde cargó la key `utils/secrets.mjs` (env,\n`dotenv:\u003cruta\u003e`, `infisical`); si hace falta, extender `secrets.mjs` para\nque reporte el origen por key sin cambiar su API actual. `keyHint` =\n`…` + últimos 4 caracteres; la key completa nunca sale de este módulo.\n`testProvider(id)`: llamada barata real (openai `GET /v1/models`, gemini\nlistar modelos, fal un `GET` autenticado a la cola, kie consulta de\ncréditos, heygen `listVoices`, elevenlabs `listVoices`, tripo\n`getBalance`) → `connected` o `error` con mensaje. `saveKey(id, key)`:\nescribir/reemplazar la línea en `~/.config/da-vinci/.env` (crear con modo\n`600`, conservar otras líneas), actualizar `process.env` y devolver el estado\ntras `testProvider`.\n\nDone when: `node --test test/providers.test.mjs` pasa con `HOME` temporal y\n`fetch` mockeado: sin key → `missing`, `saveKey` crea el archivo con modo\n600 y no pisa otras keys, `keyHint` nunca contiene la key completa, un 401\nen el test → `error`.",
-      "model": "claude/opus",
-      "reason": "Maneja secretos y permisos de archivo; vale el tier premium.",
-      "status": "backlog",
-      "dependencies": [],
-      "estimateHours": 3.0,
-      "files": [
-        "src/core/providers-status.mjs",
-        "src/utils/secrets.mjs",
-        "test/providers.test.mjs"
-      ],
-      "specRef": "f2-servidor-api.md#F2.4.T1",
-      "comments": []
-    },
-    {
-      "id": "F2.4.T2",
-      "phase": 2,
-      "title": "Rutas /api/providers",
-      "description": "Llenar `src/server/routes/providers.mjs`: `GET /api/providers`,\n`PUT /api/providers/:id/key` (`{key}` no vacío, si no 400),\n`POST /api/providers/:id/test`, usando `providers-status.mjs`. Proveedor\ndesconocido → 404.\n\nDone when: `node --test test/providers-routes.test.mjs` pasa cubriendo las\ntres rutas y verificando que ninguna respuesta contiene la key completa.",
-      "model": "claude/claude-haiku-4-5",
-      "reason": "Tres rutas finas sobre un módulo ya probado.",
-      "status": "backlog",
-      "dependencies": [
-        "F2.4.T1",
-        "F2.1.T1"
-      ],
-      "estimateHours": 1.0,
-      "files": [
-        "src/server/routes/providers.mjs",
-        "test/providers-routes.test.mjs"
-      ],
-      "specRef": "f2-servidor-api.md#F2.4.T2",
-      "comments": []
-    },
-    {
-      "id": "F2.5.T1",
-      "phase": 2,
-      "title": "Smoke test del servidor",
-      "description": "Crear `test/e2e.test.mjs`: arranca `startServer` en puerto 0 con\n`DAVINCI_HOME` temporal y `fetch` de proveedores mockeado; genera una imagen\npor `POST /api/generations`, espera el evento `job` `done` por SSE, genera\nun video con `inputs:[{id}]` de esa imagen, verifica el linaje en\n`GET /api/library/:id`, genera por `/v1/images/generations`, y comprueba\n`GET /api/spend` suma los tres costos. Además corre el CLI contra la misma\n`DAVINCI_HOME` y verifica que su generación aparece en `GET /api/library`.\n\nDone when: `npm test` pasa entero incluyendo `test/e2e.test.mjs`.",
+      "title": "Asistente de tres pasos",
+      "description": "Construir el onboarding de `docs/layout.pen`: panel de arte a la izquierda,\nasistente a la derecha, tres pasos con progreso visible (agente, llaves,\ncarpeta).\n\nDos reglas del PRD que no son negociables y que son el motivo de esta pantalla:\n\n- **Una sola llave alcanza para continuar** (FR-6). El paso de llaves se\n  satisface con cualquier proveedor conectado; el texto guía hacia FAL porque\n  solo ya cubre imagen, video y SVG. Los otros seis se ofrecen pero no bloquean.\n- **El asistente termina con una generación real, no con un formulario\n  guardado** (FR-7). El último paso dispara una generación de costo bajo y no\n  se considera completo hasta que el asset existe en la biblioteca.\n\nIncluir el aviso de dónde quedaron guardadas las llaves, con el texto ajustado\na lo que realmente pasó según lo que reporte `secrets_list` (llavero o archivo\nde respaldo), y el paso de migración cuando `GET /api/migration` detecte una\ninstalación previa.\n\nDone when: partiendo de cero, conectando sólo una llave, el asistente se\ncompleta y deja un asset generado visible en la galería.",
       "model": "claude/claude-sonnet-5",
-      "reason": "Test de integración sobre piezas terminadas.",
+      "reason": "Es la pantalla que decide si el usuario se queda; la lógica es simple pero el recorrido tiene que estar exacto.",
       "status": "backlog",
       "dependencies": [
-        "F2.1.T3",
         "F2.3.T1",
-        "F2.4.T2"
+        "F2.2.T2"
       ],
-      "estimateHours": 2.0,
+      "estimateHours": 4.0,
       "files": [
-        "test/e2e.test.mjs"
+        "ui/src/pages/Onboarding/index.tsx",
+        "ui/src/pages/Onboarding/Steps.tsx",
+        "ui/src/pages/Onboarding/ArtPanel.tsx"
       ],
-      "specRef": "f2-servidor-api.md#F2.5.T1",
+      "specRef": "f2-primera-vez.md#F2.3.T2",
       "comments": []
     },
     {
       "id": "F3.1.T1",
       "phase": 3,
-      "title": "Proyecto Vite y build",
-      "description": "Crear el proyecto en `ui/` (Vite, React, TypeScript estricto,\n`react-router-dom`). `vite build` escribe en `../dist/ui` con `base: '/'`;\nen dev, proxy de `/api`, `/v1` y `/files` a `http://127.0.0.1:20130`.\n`App.tsx` registra todas las rutas del SPA apuntando a páginas stub\n(`ui/src/pages/{Library,Asset,Studio,Providers,Spend}/index.tsx`, cada una\ncon un título), `Layout.tsx` con navegación lateral (colapsa a barra\ninferior en móvil) y un stub `ui/src/components/JobsTray.tsx`. `styles.css`\ncon los tokens de color, tipografía y espaciado.\n\nEn el `package.json` raíz: scripts `build:ui` (`npm --prefix ui ci \u0026\u0026 npm\n--prefix ui run build`) y `prepublishOnly` (`npm run build:ui \u0026\u0026 npm test`),\n`files` con `src/`, `dist/ui/`, `SKILL.md`, `install.mjs`, `README*.md`,\n`LICENSE`, `.env.example`, `docs/references/`. En `.gitignore`: `dist/` y\n`ui/node_modules/`.\n\nDone when: `npm run build:ui` termina sin errores ni warnings de TS,\n`npm --prefix ui run preview` muestra el dashboard y las 5 rutas navegan\n(incluido recargar en `/spend`), y `npm pack --dry-run` lista\n`dist/ui/index.html` y no lista `ui/`. No depende del servidor: que\n`davinci serve` sirva `dist/ui` lo verifica F3.1.T2.",
+      "title": "Formulario de generación y modelos sugeridos",
+      "description": "Construir la pantalla de Estudio de `docs/layout.pen`: columna de formulario a\nla izquierda, lienzo de resultado a la derecha.\n\nEl formulario tiene tipo de asset (imagen, video, SVG, voz, 3D), prompt,\nmodelos sugeridos y parámetros. Al cambiar el tipo, los modelos sugeridos\ncambian: salen de `GET /api/models`, que ya devuelve el catálogo filtrado por\nproveedor con llave válida (FR-11). El usuario puede forzar cualquiera de los\npropuestos en vez del primero.\n\nLos parámetros que se muestran dependen del tipo y del modelo elegido; no\ninventar parámetros que el catálogo no declare.\n\nDone when: cambiar el tipo de asset cambia la lista de modelos sugeridos;\nsin llave de un proveedor, ninguno de sus modelos aparece; y generar dispara\n`POST /api/generations` con el modelo y los parámetros que la pantalla muestra.",
       "model": "claude/claude-sonnet-5",
-      "reason": "Scaffolding de front estándar.",
+      "reason": "Pantalla central del producto, con estado que depende del catálogo y del tipo elegido.",
       "status": "backlog",
-      "dependencies": [],
-      "estimateHours": 3.0,
-      "files": [
-        "ui/package.json",
-        "ui/package-lock.json",
-        "ui/tsconfig.json",
-        "ui/vite.config.ts",
-        "ui/index.html",
-        "ui/src/main.tsx",
-        "ui/src/App.tsx",
-        "ui/src/styles.css",
-        "ui/src/components/Layout.tsx",
-        "ui/src/components/JobsTray.tsx",
-        "ui/src/pages/Library/index.tsx",
-        "ui/src/pages/Asset/index.tsx",
-        "ui/src/pages/Studio/index.tsx",
-        "ui/src/pages/Providers/index.tsx",
-        "ui/src/pages/Spend/index.tsx",
-        "package.json",
-        ".gitignore"
+      "dependencies": [
+        "F1.5.T2"
       ],
-      "specRef": "f3-library-ui.md#F3.1.T1",
+      "estimateHours": 4.0,
+      "files": [
+        "ui/src/pages/Studio/index.tsx",
+        "ui/src/pages/Studio/ModelPicker.tsx",
+        "ui/src/pages/Studio/Params.tsx"
+      ],
+      "specRef": "f3-generar.md#F3.1.T1",
       "comments": []
     },
     {
       "id": "F3.1.T2",
       "phase": 3,
-      "title": "Cliente de API, SSE y bandeja de trabajos",
-      "description": "`ui/src/types.ts`: tipos TS de `Generation`, `Job`, `Estimate`,\n`GenerationRequest`, `ModelInfo`, `ProviderStatus`, `SpendRow` copiados\nde *Interfaces*. `ui/src/api.ts`: una función por ruta de `/api`, que lanza\n`ApiError{code,status,message,details}`, manda `Authorization` si hay\ntoken guardado y `X-Davinci-Source: dashboard`; helper `fileUrl(id)` que\nagrega `?key=` cuando hay token. `ui/src/sse.ts`: hook `useServerEvents`\ncon reconexión automática y un store mínimo (sin librerías) de jobs\nactivos. `JobsTray.tsx`: botón con contador de trabajos en curso y panel con\ncada trabajo (tipo, modelo, estado, error, link al asset al terminar);\nsobrevive recargas pidiendo `GET /api/jobs?status=queued,running` al\nmontar. `ApiKeyGate.tsx`: si una llamada da 401, pide la API key, la guarda\nen `localStorage` (con try/catch) y reintenta. Montar ambos en\n`Layout.tsx`/`App.tsx`.\n\nDone when: `npm run build:ui` pasa sin errores de TS,\n`node src/generate.mjs serve --no-open` sirve el dashboard en `/` (recargar\nen `/spend` también funciona) y, con el servidor corriendo, lanzar un job con `curl` a `POST /api/generations` hace aparecer\nel trabajo en la bandeja y pasar a \"listo\" sin recargar.",
+      "title": "Lienzo de resultado y cola del estudio",
+      "description": "Completar la mitad derecha del Estudio: el lienzo que muestra el asset\ngenerado y la tira de trabajos recientes debajo.\n\nEl lienzo muestra el resultado con las acciones de la barra superior del diseño\n(favorito, copiar, descargar, abrir carpeta, derivar, borrar); las que dependen\ndel sistema de archivos se conectan en F4.3.T1 y acá quedan deshabilitadas con\nsu lugar hecho. La tira de trabajos se alimenta del flujo de eventos que\n`ui/src/sse.ts` ya maneja.\n\nDone when: generar muestra el resultado en el lienzo sin recargar, y los\ncambios de estado del trabajo aparecen en la tira en vivo.",
       "model": "claude/claude-sonnet-5",
-      "reason": "Capa de datos del front sobre contrato fijo.",
+      "reason": "Reusa el cliente de eventos existente; el trabajo es de presentación.",
       "status": "backlog",
       "dependencies": [
-        "F3.1.T1",
-        "F2.1.T3"
+        "F3.1.T1"
       ],
       "estimateHours": 3.0,
       "files": [
-        "ui/src/types.ts",
-        "ui/src/api.ts",
-        "ui/src/sse.ts",
-        "ui/src/components/JobsTray.tsx",
-        "ui/src/components/ApiKeyGate.tsx",
-        "ui/src/components/Layout.tsx",
-        "ui/src/App.tsx"
+        "ui/src/pages/Studio/Canvas.tsx",
+        "ui/src/pages/Studio/JobStrip.tsx"
       ],
-      "specRef": "f3-library-ui.md#F3.1.T2",
+      "specRef": "f3-generar.md#F3.1.T2",
       "comments": []
     },
     {
       "id": "F3.2.T1",
       "phase": 3,
-      "title": "Grilla, búsqueda y filtros",
-      "description": "Página Library en `ui/src/pages/Library/`: grilla responsive de tarjetas\n(miniatura con `loading=\"lazy\"`; video con `preload=\"metadata\"` y play al\nhover; audio/sfx con ícono y reproductor al abrir; GLB y SVG con ícono o\n`\u003cimg\u003e`), en cada tarjeta prompt truncado, modelo, costo estimado, fecha\nrelativa y estrella de favorito (`PATCH`). Barra con búsqueda (debounce\n250 ms), filtros por tipo, proveedor, modelo (de `GET /api/models`),\nproyecto (de `GET /api/projects`), rango de fechas y solo favoritos; el\nestado de filtros vive en la query string. Scroll infinito con\n`nextCursor`. Se agregan arriba las generaciones nuevas que llegan por SSE\nsi coinciden con los filtros, y desaparecen las borradas. Clic en tarjeta →\n`/asset/:id`. Estados vacío, cargando y error.\n\nDone when: `npm run build:ui` pasa, y con una biblioteca de prueba de 5 000\nfilas (script `ui/scripts/seed.mjs` que las inserta en una\n`DAVINCI_HOME` dada usando `openLibrary`) la primera página aparece en \u003c 1 s\ny buscar por texto filtra correctamente.",
-      "model": "claude/claude-sonnet-5",
-      "reason": "UI de lista con estado; estándar.",
+      "title": "Umbral de confirmación y tope diario",
+      "description": "Agregar a `src/core/config.mjs` los valores que gobiernan el gasto: umbral por\nencima del cual una generación pide confirmación (FR-17) y tope de gasto diario\n(FR-32), con sus defaults.\n\nHacer que el servidor los aplique: una generación por encima del umbral\nresponde pidiendo confirmación explícita en vez de ejecutarse, y con el tope\ndiario alcanzado responde bloqueado **sin llamar a ningún proveedor**. El gasto\ndel día sale de la biblioteca, que ya lo registra.\n\nExtender `POST /api/estimate` con el modo de sólo estimar del FR-18: calcula el\ncosto sin llamar a nadie, sin registrar gasto y sin crear ningún asset.\n\nDone when: tests de `node --test` cubren los tres casos — por debajo del umbral\nejecuta directo, por encima exige confirmación, con el tope alcanzado bloquea; y\nel modo de sólo estimar no deja rastro en la biblioteca ni en el gasto.",
+      "model": "claude/opus",
+      "reason": "Es la barrera que decide si se gasta plata del usuario; los casos límite tienen que estar cerrados.",
       "status": "backlog",
       "dependencies": [
-        "F3.1.T2"
+        "F2.2.T2"
       ],
       "estimateHours": 4.0,
       "files": [
-        "ui/src/pages/Library/",
-        "ui/scripts/seed.mjs"
+        "src/core/config.mjs",
+        "src/server/routes/api.mjs",
+        "test/cost-gate.test.mjs"
       ],
-      "specRef": "f3-library-ui.md#F3.2.T1",
+      "specRef": "f3-generar.md#F3.2.T1",
+      "comments": []
+    },
+    {
+      "id": "F3.2.T2",
+      "phase": 3,
+      "title": "Barrera de costo en la interfaz",
+      "description": "Construir `ui/src/components/CostGate.tsx`, el componente que muestra el costo\nantes de cada generación y pide confirmación cuando corresponde.\n\nMuestra costo estimado de la acción, gasto acumulado del día, tope, y la barra\nde presupuesto de `docs/layout.pen`. Por encima del umbral abre la\nconfirmación; con el tope alcanzado deshabilita generar y explica por qué.\nEs el mismo componente que usa el Chat (F5.2.T2), así que vive en\n`components/`.\n\nDone when: una generación por debajo del umbral se ejecuta sin interrupción,\nuna por encima abre la confirmación con el costo real, y alcanzado el tope el\nbotón de generar queda deshabilitado con el motivo visible.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Componente compartido, simple, pero es lo que el usuario mira antes de cada gasto.",
+      "status": "backlog",
+      "dependencies": [
+        "F3.2.T1",
+        "F3.1.T1"
+      ],
+      "estimateHours": 3.0,
+      "files": [
+        "ui/src/components/CostGate.tsx"
+      ],
+      "specRef": "f3-generar.md#F3.2.T2",
       "comments": []
     },
     {
       "id": "F3.3.T1",
       "phase": 3,
-      "title": "Visores por tipo de asset",
-      "description": "Componentes en `ui/src/components/viewers/`: `ImageViewer` (zoom al clic),\n`SvgViewer` (como `\u003cimg\u003e`, fondo a cuadros), `VideoViewer` (`\u003cvideo\ncontrols\u003e`), `AudioViewer` (`\u003caudio controls\u003e`), `ModelViewer` (GLB con\n`@google/model-viewer`, importado de forma diferida solo cuando se usa), y\n`AssetViewer` que elige por `kind`/`mime`. Todos reciben\n`Generation` y usan `fileUrl(id)`. Agregar `@google/model-viewer` a\n`ui/package.json`.\n\nDone when: `npm run build:ui` pasa, el chunk principal no incluye\nmodel-viewer (verificar en el output de build), y cada visor se ve con un\narchivo de ejemplo de `docs/examples/`.",
+      "title": "Adjuntar referencias a una generación",
+      "description": "Implementar el adjuntado de referencias del FR-19: arrastrar archivos del\nsistema, elegir un asset de la biblioteca, o pegar una URL.\n\nDos componentes: `RefDrop.tsx` es la zona de arrastre con la lista de\nreferencias adjuntas y su acción de quitar; `AssetPicker.tsx` —que ya existe en\nel repo— se adapta para elegir de la biblioteca en vez de reescribirse.\n\nEl selector de archivos del sistema usa el plugin de diálogos de Tauri, no un\n`input` de archivo: la app tiene que abrir el diálogo nativo. Agregar\n`dialog:default` a la capability.\n\nDone when: las tres formas de adjuntar dejan la referencia en la lista, quitarla\nla saca, y la generación viaja al proveedor con las referencias adjuntas para\nlos modelos que las soportan.",
       "model": "claude/claude-sonnet-5",
-      "reason": "Componentes de presentación simples.",
+      "reason": "Tres orígenes distintos de entrada y un permiso de Tauri nuevo que hay que declarar.",
       "status": "backlog",
       "dependencies": [
-        "F3.1.T2"
+        "F3.1.T1"
       ],
-      "estimateHours": 2.0,
+      "estimateHours": 3.5,
       "files": [
-        "ui/src/components/viewers/",
-        "ui/package.json",
-        "ui/package-lock.json"
+        "ui/src/components/RefDrop.tsx",
+        "ui/src/components/AssetPicker.tsx",
+        "src-tauri/capabilities/default.json"
       ],
-      "specRef": "f3-library-ui.md#F3.3.T1",
-      "comments": []
-    },
-    {
-      "id": "F3.3.T2",
-      "phase": 3,
-      "title": "Página de detalle con linaje",
-      "description": "Página `ui/src/pages/Asset/index.tsx` (y componentes en esa carpeta): visor\ngrande con `AssetViewer`, prompt completo con botón copiar, modelo (y \"pedido:\nX\" si `requestedModel` difiere), parámetros, costo estimado, fecha, origen,\nproyecto, ruta del archivo con copiar, descargar. Linaje: padres e hijos\ncomo miniaturas navegables; un padre borrado o externo (`input_ref` sin id)\nse muestra como tal. Favorito y borrar (diálogo con opción \"borrar también el\narchivo\"; tras borrar vuelve a Library). Dejar un contenedor\n`\u003cdiv data-slot=\"actions\"\u003e` donde F4.2.T1 montará las acciones. Reacciona a\n`generation` por SSE agregando hijos nuevos.\n\nDone when: `npm run build:ui` pasa y, con el servidor y datos de prueba, se\nnavega de un GLB a la imagen origen y de ahí a su otro hijo; borrar un\npadre deja al hijo mostrando \"origen borrado\".",
-      "model": "claude/claude-sonnet-5",
-      "reason": "Página de detalle con navegación; estándar.",
-      "status": "backlog",
-      "dependencies": [
-        "F3.3.T1"
-      ],
-      "estimateHours": 3.0,
-      "files": [
-        "ui/src/pages/Asset/"
-      ],
-      "specRef": "f3-library-ui.md#F3.3.T2",
+      "specRef": "f3-generar.md#F3.3.T1",
       "comments": []
     },
     {
       "id": "F4.1.T1",
       "phase": 4,
-      "title": "Formulario de generación con costo",
-      "description": "Página `ui/src/pages/Studio/`: selector de tipo (image, svg, video,\nmodel-3d, audio, sfx, avatar-video, bg-remove, upscale); por tipo, solo los\ncampos que aplican (prompt/text/script, aspecto, duración, calidad, n,\nvoz — de `/api/...` si existe o campo libre —, textura/PBR, estilo, motor de\nupscale); selector de modelo con \"Auto\" primero y los de `GET\n/api/models?kind=` (deshabilitados si `available: false`, con aviso \"sin\nkey\" y link a `/providers`). Estimación en vivo con `POST /api/estimate`\n(debounce 400 ms): costo, nivel y candidatos de fallback. Enviar: si el\nnivel es `confirm`, diálogo de confirmación que reenvía con `confirm: true`;\n`budget_exceeded` se muestra con el tope. Tras enviar, el trabajo aparece en\nla bandeja y el formulario queda listo para otra generación. Cuando el job\ntermina, mostrar el resultado debajo con link al detalle.\n\nDone when: `npm run build:ui` pasa y, con el servidor y proveedores\nmockeados o reales, se genera una imagen con modelo Auto, el costo mostrado\nantes de enviar es igual al de `davinci image --dry-run` con los mismos\nparámetros, y un video de costo alto pide confirmación.",
+      "title": "Grilla, lista, búsqueda y filtros",
+      "description": "Construir la galería de `docs/layout.pen`: alternancia entre grilla y lista,\nbúsqueda por prompt, modelo o proyecto, y filtros por tipo de asset y favoritos.\n\nTodo sale de `GET /api/library`, que ya acepta filtros y paginado por cursor.\nLa barra superior lleva la ruta de la carpeta de assets, el buscador y los\nfiltros; el pie muestra el conteo y el peso en disco.\n\nReusar la página que ya existe en `ui/src/pages/Library/` en vez de empezar de\ncero: cambia el sistema visual y se agregan la vista de lista y los filtros por\ntipo, no la lógica de datos.\n\nDone when: buscar un fragmento de prompt deja sólo los assets que lo contienen,\ncada filtro acota como corresponde, y alternar entre grilla y lista conserva la\nbúsqueda y los filtros activos.",
       "model": "claude/claude-sonnet-5",
-      "reason": "Formulario dinámico con varios estados; estándar.",
+      "reason": "Reestilado más funciones nuevas sobre una página existente que ya resuelve los datos.",
       "status": "backlog",
       "dependencies": [
-        "F3.1.T2"
+        "F1.5.T2"
       ],
       "estimateHours": 4.0,
       "files": [
-        "ui/src/pages/Studio/"
+        "ui/src/pages/Library/index.tsx",
+        "ui/src/pages/Library/Filters.tsx",
+        "ui/src/pages/Library/ListView.tsx"
       ],
-      "specRef": "f4-studio.md#F4.1.T1",
+      "specRef": "f4-biblioteca.md#F4.1.T1",
       "comments": []
     },
     {
       "id": "F4.1.T2",
       "phase": 4,
-      "title": "Inputs desde la biblioteca y precarga",
-      "description": "`ui/src/components/AssetPicker.tsx`: diálogo que reutiliza la API de\n`/api/library` (búsqueda + filtro por tipo) para elegir uno o varios assets,\ny también acepta una URL. Integrarlo en Studio para los tipos que aceptan\ninputs (`acceptsInputs` del modelo): mostrar los elegidos como miniaturas\nquitables y enviarlos como `inputs:[{id}|{url}]`. Studio lee la query\n`kind`, `model`, `input` (repetible) y `prompt` al montar y se precarga.\n\nDone when: `npm run build:ui` pasa y abrir\n`/studio?kind=video\u0026input=\u003cid-de-imagen\u003e\u0026prompt=hola` muestra el formulario\nde video con la imagen elegida y el prompt; generar deja el video como hijo\nde la imagen en su detalle.",
+      "title": "Estado vacío y listas largas",
+      "description": "Dos cosas que la galería necesita en los extremos.\n\nEl estado vacío del FR-23: sin assets, la pantalla ofrece generar el primero en\nvez de mostrar una grilla vacía, con el texto y la acción de `docs/layout.pen`.\n\nLas listas largas del NFR-7: la galería tiene que seguir fluida con al menos\n5.000 assets. Virtualizar el renderizado de la grilla y de la lista. No agregar\ndependencias si se puede resolver con un observador de intersección y el\npaginado por cursor que la API ya ofrece.\n\nDone when: sin assets aparece el estado vacío con su acción; con 5.000 registros\nsembrados, desplazarse por la galería no traba la interfaz y la memoria no crece\nsin techo.",
       "model": "claude/claude-sonnet-5",
-      "reason": "Componente de selección más cableado de query.",
+      "reason": "La virtualización tiene que medirse contra un caso real, no asumirse.",
       "status": "backlog",
       "dependencies": [
         "F4.1.T1"
       ],
       "estimateHours": 3.0,
       "files": [
-        "ui/src/components/AssetPicker.tsx",
-        "ui/src/pages/Studio/"
+        "ui/src/pages/Library/EmptyState.tsx",
+        "ui/src/components/VirtualGrid.tsx"
       ],
-      "specRef": "f4-studio.md#F4.1.T2",
+      "specRef": "f4-biblioteca.md#F4.1.T2",
       "comments": []
     },
     {
       "id": "F4.2.T1",
       "phase": 4,
-      "title": "Acciones desde el detalle",
-      "description": "`ui/src/pages/Asset/Actions.tsx`, montado en el `data-slot=\"actions\"` del\ndetalle: Regenerar (mismo pedido: `kind`, `model`, `prompt`, params e\ninputs, directo a `POST /api/generations` con confirmación si hace falta),\nVariar prompt (abre Studio precargado), y según el tipo del asset: imagen →\n\"Animar (video)\", \"Modelo 3D\", \"Quitar fondo\", \"Upscale\"; SVG → \"Rasterizar\na imagen\" solo si algún modelo lo soporta, si no, ocultar; video, audio y 3D\nsolo Regenerar/Variar. Cada acción de encadenamiento es un link a\n`/studio?kind=…\u0026input=\u003cid\u003e`.\n\nDone when: `npm run build:ui` pasa y desde el detalle de una imagen, \"Animar\n(video)\" abre Studio con la imagen cargada y \"Regenerar\" crea un nuevo job\ncon el mismo prompt y modelo.",
-      "model": "claude/claude-haiku-4-5",
-      "reason": "Botones y links sobre piezas existentes.",
+      "title": "Detalle del asset con visores y metadatos",
+      "description": "Construir la pantalla de detalle de `docs/layout.pen`: visor a la izquierda,\npanel de datos a la derecha con prompt completo, metadatos, archivo en disco y\nnavegación entre assets.\n\nLos visores por tipo ya existen en `ui/src/components/viewers/`: imagen, video,\nSVG, audio y 3D con `@google/model-viewer`. Se reestilan, no se reescriben.\n\nDone when: cada tipo de asset abre en su visor correspondiente, el panel muestra\nprompt, modelo, proveedor, costo, parámetros y ruta en disco, y las flechas\nnavegan al asset anterior y siguiente sin volver a la galería.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Cinco tipos de asset con su visor, sobre componentes que ya funcionan.",
       "status": "backlog",
       "dependencies": [
-        "F3.3.T2"
+        "F1.5.T2"
       ],
-      "estimateHours": 2.0,
+      "estimateHours": 4.0,
       "files": [
-        "ui/src/pages/Asset/Actions.tsx",
-        "ui/src/pages/Asset/index.tsx"
+        "ui/src/pages/Asset/index.tsx",
+        "ui/src/pages/Asset/MetaPanel.tsx",
+        "ui/src/components/viewers/index.tsx"
       ],
-      "specRef": "f4-studio.md#F4.2.T1",
+      "specRef": "f4-biblioteca.md#F4.2.T1",
+      "comments": []
+    },
+    {
+      "id": "F4.2.T2",
+      "phase": 4,
+      "title": "Linaje y usar como referencia",
+      "description": "Completar el detalle con lo que convierte la biblioteca en un lugar de trabajo\ny no en una carpeta.\n\nEl linaje del FR-21: mostrar de qué asset salió este y qué assets salieron de\nél. La tabla `generation_inputs` ya resuelve la relación en ambas direcciones;\nsólo hay que pedirla y mostrarla, con navegación a cada extremo.\n\nEl FR-22: la acción de usar como referencia deja el asset adjunto en el\nformulario de generación **sin que el usuario copie ninguna ruta**, reusando el\ncomponente de referencias de F3.3.T1.\n\nDone when: un asset derivado muestra su origen y el origen muestra sus\nderivados, ambos navegables; y usar como referencia lleva al Estudio con el\nasset ya adjunto.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "La relación ya está en la base; el trabajo es de presentación y de encadenar dos pantallas.",
+      "status": "backlog",
+      "dependencies": [
+        "F4.2.T1",
+        "F3.3.T1"
+      ],
+      "estimateHours": 3.0,
+      "files": [
+        "ui/src/pages/Asset/Lineage.tsx"
+      ],
+      "specRef": "f4-biblioteca.md#F4.2.T2",
+      "comments": []
+    },
+    {
+      "id": "F4.3.T1",
+      "phase": 4,
+      "title": "Abrir en el explorador y borrar con confirmación",
+      "description": "Las dos acciones que tocan el disco del usuario.\n\nAbrir en el explorador (FR-24): completar `reveal_in_files` en\n`src-tauri/src/platform.rs` para que abra Finder en macOS, el Explorador en\nWindows y el gestor de archivos en Linux, **seleccionando el archivo**, no sólo\nla carpeta. Declarar el permiso del plugin de apertura acotado a la carpeta de\nassets; no dar acceso a todo el disco.\n\nBorrar (FR-23 y FR-48): la confirmación dice exactamente qué se borra —cuántos\nregistros y si además se eliminan los archivos— antes de hacer nada. La\ndestrucción de toda la biblioteca exige confirmación escrita, no un botón.\n\nDone when: la acción abre el explorador con el archivo seleccionado en los tres\nsistemas; borrar un asset pide confirmación nombrando lo que elimina; y la\nacción destructiva de Ajustes no se dispara sin texto confirmado.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Toca el sistema de archivos del usuario en tres sistemas operativos y una de las acciones es irreversible.",
+      "status": "backlog",
+      "dependencies": [
+        "F1.5.T1",
+        "F4.1.T1"
+      ],
+      "estimateHours": 3.0,
+      "files": [
+        "src-tauri/src/platform.rs",
+        "ui/src/components/ConfirmDelete.tsx"
+      ],
+      "specRef": "f4-biblioteca.md#F4.3.T1",
       "comments": []
     },
     {
       "id": "F5.1.T1",
       "phase": 5,
-      "title": "Pantalla Providers",
-      "description": "`ui/src/pages/Providers/`: una tarjeta por proveedor con estado\n(conectado / sin key / error, con el mensaje), origen de la key, `keyHint`,\nqué tipos cubre (de `/api/models`), botón \"Probar conexión\" y formulario\n\"Pegar key\" (input `type=\"password\"`, `autocomplete=\"off\"`, se limpia tras\nguardar). Aviso fijo de dónde se guardan las keys\n(`~/.config/da-vinci/.env`) y de que Infisical, si está configurado, tiene\nprioridad.\n\nDone when: `npm run build:ui` pasa y, con el servidor, pegar una key de\nprueba cambia el estado sin recargar y la key no aparece en ninguna\nrespuesta de red (revisar con DevTools o `curl`).",
-      "model": "claude/claude-haiku-4-5",
-      "reason": "Pantalla simple sobre rutas ya probadas.",
+      "title": "Detección de agentes instalados",
+      "description": "Completar `agent_detect()` en `src-tauri/src/agent.rs` según *Components →\ntauri/agent* del arch.\n\nBuscar binarios de agente en el `PATH` y en las rutas habituales de cada\nsistema operativo, devolviendo por cada uno: nombre, ruta, versión si se puede\nobtener barato, y si está disponible. El FR-33 pide que el usuario no tenga que\nescribir la ruta a mano.\n\nLa ausencia total de agentes **no es un error**: devuelve una lista vacía y la\napp sigue funcionando (FR-34).\n\nDone when: con un agente instalado, la detección lo encuentra sin configuración\nprevia; sin ninguno, devuelve lista vacía y ningún otro comando de la app falla.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Exploración del sistema de archivos con diferencias por plataforma, sin lógica compleja.",
       "status": "backlog",
       "dependencies": [
-        "F3.1.T2",
-        "F2.4.T2"
+        "F1.1.T1"
       ],
-      "estimateHours": 2.0,
+      "estimateHours": 2.5,
       "files": [
-        "ui/src/pages/Providers/"
+        "src-tauri/src/agent.rs"
       ],
-      "specRef": "f5-providers-spend.md#F5.1.T1",
+      "specRef": "f5-conversar.md#F5.1.T1",
+      "comments": []
+    },
+    {
+      "id": "F5.1.T2",
+      "phase": 5,
+      "title": "Lanzamiento del agente y transmisión de su salida",
+      "description": "Implementar `agent_send` y `agent_cancel` en `src-tauri/src/agent.rs`.\n\n`agent_send` lanza el agente configurado como subproceso, en el directorio de\ntrabajo que el usuario eligió, y transmite su salida al frontend por un\n`Channel` tipado. El enum de eventos es el que fija *Interfaces → Comandos\nTauri* del arch: `Chunk`, `ToolCall`, `Cost`, `Done`, `Error`, serializado con\n`#[serde(tag = \"event\", content = \"data\")]`.\n\nDos cosas que no son negociables:\n\n- **Validar la ruta del binario contra la que el usuario configuró antes de\n  ejecutar.** La decisión D8 saca el permiso de shell del frontend justo para\n  que el único camino a ejecutar un proceso sea este, con argumentos tipados.\n- `agent_cancel` corta el subproceso siempre, incluso si dejó de responder.\n\nDone when: enviar un mensaje devuelve la salida del agente en trozos a medida\nque llega, no al final; cancelar termina el subproceso y libera el canal; y un\nagente que muere a mitad emite `Error` en vez de dejar la interfaz colgada.",
+      "model": "claude/opus",
+      "reason": "Subproceso con transmisión incremental y cancelación, y es la superficie de ejecución de la app: tiene que quedar cerrada.",
+      "status": "backlog",
+      "dependencies": [
+        "F5.1.T1"
+      ],
+      "estimateHours": 4.0,
+      "files": [
+        "src-tauri/src/agent.rs"
+      ],
+      "specRef": "f5-conversar.md#F5.1.T2",
       "comments": []
     },
     {
       "id": "F5.2.T1",
       "phase": 5,
-      "title": "Pantalla Spend",
-      "description": "`ui/src/pages/Spend/`: selector de rango (7 d, 30 d, mes actual, custom),\ntotal del rango y del mes actual, barras por día en SVG propio (sin librería\nde gráficos; tooltip con valor, eje con montos, accesible con `\u003ctitle\u003e` y\ntabla alternativa), tablas por proveedor y por modelo con conteo y costo,\ntodo desde `GET /api/spend`. Muestra el tope diario de config si existe y\ncuánto queda hoy. Etiqueta visible: \"costos estimados según tabla de\nprecios\".\n\nDone when: `npm run build:ui` pasa y con datos de prueba el total del rango\ncoincide con la suma de costos de `GET /api/library` en ese rango.",
+      "title": "Hilo y composer",
+      "description": "Construir la pantalla de Chat de `docs/layout.pen`: encabezado con el agente\nelegido, hilo de mensajes, y composer abajo.\n\nEl hilo alterna mensajes del usuario y del agente; los del agente muestran\ntexto, llamadas a herramientas y resultados, alimentados por el `Channel` de\nF5.1.T2 a medida que llegan. El composer lleva las referencias adjuntas\n—reusando el componente de F3.3.T1—, los intents (imagen, video, SVG, voz, 3D),\nel modelo elegido y el botón de generar.\n\nDone when: escribir un mensaje muestra la respuesta del agente apareciendo de a\npoco; adjuntar un asset de la biblioteca lo manda como referencia; y un asset\ngenerado desde el chat aparece en la galería con su prompt y su costo (FR-35).",
       "model": "claude/claude-sonnet-5",
-      "reason": "Gráfico SVG a mano con accesibilidad; estándar.",
+      "reason": "La pantalla más densa del diseño, sobre un puente que ya está resuelto.",
       "status": "backlog",
       "dependencies": [
-        "F3.1.T2"
+        "F5.1.T2",
+        "F3.3.T1"
+      ],
+      "estimateHours": 4.0,
+      "files": [
+        "ui/src/pages/Chat/index.tsx",
+        "ui/src/pages/Chat/Thread.tsx",
+        "ui/src/pages/Chat/Composer.tsx"
+      ],
+      "specRef": "f5-conversar.md#F5.2.T1",
+      "comments": []
+    },
+    {
+      "id": "F5.2.T2",
+      "phase": 5,
+      "title": "Costo de sesión y ausencia del agente",
+      "description": "Los dos bordes del Chat.\n\nEl costo (FR-36): el encabezado muestra el gasto acumulado de la sesión, y\nantes de ejecutar una generación se muestra su costo estimado. Por encima del\numbral, la confirmación es la misma barrera de F3.2.T2 — no una segunda\nimplementación.\n\nLa ausencia (FR-34): sin ningún agente detectado, la pantalla explica cuál\ninstalar y cómo, con el enlace correspondiente, y **el resto de la app sigue\nfuncionando normalmente**. No es un error ni un bloqueo: es un estado.\n\nDone when: el costo de la sesión acumula a medida que se generan assets; una\ngeneración cara pide confirmación también desde el chat; y con el agente\ndesinstalado, la pantalla muestra la guía y las otras cinco pantallas funcionan.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Reusa la barrera de costo ya construida; el estado de ausencia es simple pero fácil de olvidar.",
+      "status": "backlog",
+      "dependencies": [
+        "F5.2.T1",
+        "F3.2.T2"
       ],
       "estimateHours": 3.0,
       "files": [
-        "ui/src/pages/Spend/"
+        "ui/src/pages/Chat/SessionCost.tsx",
+        "ui/src/pages/Chat/NoAgent.tsx"
       ],
-      "specRef": "f5-providers-spend.md#F5.2.T1",
+      "specRef": "f5-conversar.md#F5.2.T2",
       "comments": []
     },
     {
       "id": "F5.3.T1",
       "phase": 5,
-      "title": "README, SKILL y CHANGELOG",
-      "description": "Actualizar `README.md` con: instalación `npm i -g da-vinci` + `davinci\nserve`, capturas o GIF (dejar placeholders con nombre de archivo en\n`docs/examples/` si no hay capturas), las 4 secciones del dashboard, la API\n(tabla de rutas nativas y ejemplo con el SDK de OpenAI apuntando a\n`http://127.0.0.1:20130/v1`), `config.json`, la biblioteca en `~/.davinci/`,\nel subcomando `import`, exponer en la red con `apiKey`, y quitar \"Web UI\ndashboard\" del roadmap. En `SKILL.md` (y copiar idéntico a\n`docs/SKILL.md`): que toda generación queda también en la biblioteca global\ny que `--refs davinci:\u003cid\u003e` encadena desde ella. En `CHANGELOG.md`, versión\n`2.0.0` con los cambios y el breaking change de Node ≥ 22.13. Subir\n`version` en `package.json` a `2.0.0`.\n\nDone when: todos los comandos del README corren tal cual (probar los que no\ngastan: `--help`, `--dry-run`, `serve --no-open`, `import`), y\n`SKILL.md` y `docs/SKILL.md` son idénticos.",
-      "model": "claude/claude-haiku-4-5",
-      "reason": "Documentación.",
+      "title": "Paleta de comandos",
+      "description": "Construir la paleta de `docs/layout.pen`: un solo campo que busca a la vez\nacciones, modelos, assets recientes y destinos de navegación, agrupados por\ncategoría (FR-39).\n\nCada grupo muestra lo suyo: las acciones con su atajo, los modelos con su costo,\nlos assets con su miniatura y su modelo, los destinos con su contador. El pie\nmuestra las teclas de navegación y el presupuesto disponible del día.\n\nLos atajos se dibujan con los símbolos del sistema en curso (FR-40), tomando el\nmodificador de `platform_info()`: nunca mostrar `⌘` en Windows o Linux.\n\nAbre con el modificador más `K`. Es un manejador de teclado dentro de la\nventana, no un atajo global del sistema: no hace falta el plugin de atajos\nglobales.\n\nDone when: escribir el nombre de un modelo lo muestra con su costo; elegir un\ndestino navega; en Windows y Linux los atajos se dibujan con `Ctrl`.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Busca sobre cuatro orígenes distintos y tiene que responder al instante.",
       "status": "backlog",
       "dependencies": [
-        "F4.1.T2",
-        "F4.2.T1",
-        "F5.1.T1",
-        "F5.2.T1",
-        "F2.5.T1"
+        "F1.5.T1",
+        "F1.5.T2"
+      ],
+      "estimateHours": 4.0,
+      "files": [
+        "ui/src/components/CommandPalette.tsx"
+      ],
+      "specRef": "f5-conversar.md#F5.3.T1",
+      "comments": []
+    },
+    {
+      "id": "F6.1.T1",
+      "phase": 6,
+      "title": "Trabajos interrumpidos, reanudar y descartar",
+      "description": "Cambiar cómo `src/server/jobs.mjs` trata los trabajos que quedaron a medias.\n\nHoy, al arrancar, `library.jobs.failInterrupted()` marca como `failed` todo lo\nque quedó `queued` o `running`. El FR-27 pide otra cosa: que queden\n**recuperables** y que decida el usuario.\n\nAgregar el estado `interrupted` y las operaciones de reanudar y descartar, con\nla migración aditiva de esquema que describe *Data model* del arch\n(`jobs.attempts` incluida, que usa F6.1.T2). Las filas viejas tienen que seguir\nsiendo válidas.\n\nCuidado con lo que se le promete al usuario: un trabajo interrumpido **no\ngarantiza que el proveedor no haya cobrado**. El estado dice que quedó a medias,\nno que salió gratis; el texto de la interfaz tiene que ser igual de honesto.\n\nDone when: tests de `node --test` cierran el servidor con trabajos en cola y\ncorriendo, lo reabren, verifican que quedaron `interrupted` y no `failed`, que\nreanudar los vuelve a ejecutar y que descartar los cierra sin ejecutarlos.",
+      "model": "claude/opus",
+      "reason": "Migración de esquema sobre datos existentes y semántica de trabajos que pueden haber costado plata.",
+      "status": "backlog",
+      "dependencies": [],
+      "estimateHours": 4.0,
+      "files": [
+        "src/server/jobs.mjs",
+        "src/library/db.mjs",
+        "test/jobs-resume.test.mjs"
+      ],
+      "specRef": "f6-controlar.md#F6.1.T1",
+      "comments": []
+    },
+    {
+      "id": "F6.1.T2",
+      "phase": 6,
+      "title": "Pausar la cola y reintentar con espera creciente",
+      "description": "Dos controles sobre la cola.\n\nPausar y reanudar (FR-28): con la cola pausada no arranca ningún trabajo nuevo;\nlos que ya están corriendo terminan. La concurrencia sigue saliendo de\n`config.json`, donde ya vive.\n\nReintento automático (FR-29): un trabajo fallido reintenta con espera creciente\n—2 s, 8 s, 32 s— hasta el límite configurado, usando el contador `attempts` que\nagregó F6.1.T1. Un fallo por límite de tasa del proveedor tiene que reintentar,\nno darse por perdido al primer intento.\n\nDone when: con concurrencia en 1 nunca hay dos trabajos a la vez; pausada, la\ncola no arranca nada nuevo; y un proveedor que devuelve límite de tasa provoca\nreintentos con las esperas esperadas antes de rendirse.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Lógica de cola acotada sobre la base que dejó la tarea anterior.",
+      "status": "backlog",
+      "dependencies": [
+        "F6.1.T1",
+        "F3.2.T1"
+      ],
+      "estimateHours": 3.0,
+      "files": [
+        "src/server/jobs.mjs",
+        "src/core/config.mjs"
+      ],
+      "specRef": "f6-controlar.md#F6.1.T2",
+      "comments": []
+    },
+    {
+      "id": "F6.1.T3",
+      "phase": 6,
+      "title": "Rutas de la cola",
+      "description": "Exponer por HTTP las operaciones de F6.1.T1 y F6.1.T2, tal como las declara\n*Interfaces → HTTP* del arch: `POST /api/jobs/:id/resume`,\n`POST /api/jobs/:id/discard`, `POST /api/queue/pause` y\n`POST /api/queue/resume`.\n\nDone when: cada ruta hace lo que dice y devuelve el estado resultante del\ntrabajo o de la cola; reanudar un trabajo que no está interrumpido responde un\nerror claro en vez de ejecutarlo igual.",
+      "model": "claude/claude-haiku-4-5",
+      "reason": "Cuatro rutas sobre funciones ya escritas, siguiendo el patrón del resto del servidor.",
+      "status": "backlog",
+      "dependencies": [
+        "F6.1.T2",
+        "F2.2.T2"
+      ],
+      "estimateHours": 2.0,
+      "files": [
+        "src/server/routes/api.mjs"
+      ],
+      "specRef": "f6-controlar.md#F6.1.T3",
+      "comments": []
+    },
+    {
+      "id": "F6.2.T1",
+      "phase": 6,
+      "title": "Pantalla de Actividad",
+      "description": "Construir la pantalla de `docs/layout.pen`: banner de recuperación arriba, tira\nde estadísticas, y lista de trabajos.\n\nEl banner aparece cuando hay trabajos interrumpidos y ofrece reanudarlos todos o\ndescartarlos, diciendo cuántos son y cuándo quedaron a medias. La tira muestra\nconcurrencia, cola, gasto de la sesión y presupuesto del día, con la acción de\npausar. La lista muestra cada trabajo con estado, modelo, costo y, si falló, el\nmensaje real del proveedor y no un error genérico (FR-25).\n\nLos filtros de arriba acotan por todos, activos, fallidos y listos.\n\nDone when: cerrando la app con trabajos en cola y reabriendo, el banner aparece\ncon el conteo correcto; reanudar los vuelve a ejecutar en vivo; y un trabajo\nfallido muestra el mensaje del proveedor.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Pantalla con estado en vivo sobre una API ya completa.",
+      "status": "backlog",
+      "dependencies": [
+        "F6.1.T3",
+        "F1.5.T2"
+      ],
+      "estimateHours": 4.0,
+      "files": [
+        "ui/src/pages/Activity/index.tsx",
+        "ui/src/pages/Activity/RecoveryBanner.tsx",
+        "ui/src/pages/Activity/JobList.tsx"
+      ],
+      "specRef": "f6-controlar.md#F6.2.T1",
+      "comments": []
+    },
+    {
+      "id": "F6.3.T1",
+      "phase": 6,
+      "title": "Exportación del gasto",
+      "description": "Agregar `GET /api/spend/export`, que devuelve el gasto del período como CSV con\nuna fila por generación (FR-31): fecha, tipo, proveedor, modelo, costo, prompt\nrecortado e identificador.\n\nEscapar correctamente los campos: los prompts traen comas, comillas y saltos de\nlínea, y un CSV mal escapado se rompe al abrirlo en una planilla.\n\nDone when: un test verifica que el archivo exportado tiene una fila por\ngeneración del período y que un prompt con comas, comillas y saltos de línea\nsobrevive intacto al ir y volver.",
+      "model": "claude/claude-haiku-4-5",
+      "reason": "Serialización mecánica; lo único con filo es el escapado.",
+      "status": "backlog",
+      "dependencies": [
+        "F6.1.T3"
+      ],
+      "estimateHours": 2.0,
+      "files": [
+        "src/server/routes/api.mjs"
+      ],
+      "specRef": "f6-controlar.md#F6.3.T1",
+      "comments": []
+    },
+    {
+      "id": "F6.3.T2",
+      "phase": 6,
+      "title": "Pantalla de Gastos",
+      "description": "Construir la pantalla de `docs/layout.pen`: cuatro indicadores arriba, gráfico\nde evolución en el medio, y tabla de desglose por modelo abajo.\n\nLos datos salen de `GET /api/spend`, que ya existe. La suma del desglose por\nmodelo tiene que coincidir con el total del período (FR-30): si no coincide, es\nun error de consulta, no de redondeo para tapar.\n\nEl gráfico se dibuja con SVG a mano. No agregar una librería de gráficos para\nuna serie temporal y un par de barras.\n\nDone when: el total de los indicadores coincide con la suma de la tabla,\ncambiar el período recalcula todo, y exportar descarga el CSV de F6.3.T1.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Presentación de datos con un gráfico propio; la consistencia de los totales es lo que hay que verificar.",
+      "status": "backlog",
+      "dependencies": [
+        "F6.3.T1",
+        "F1.5.T2"
+      ],
+      "estimateHours": 4.0,
+      "files": [
+        "ui/src/pages/Spend/index.tsx",
+        "ui/src/pages/Spend/Chart.tsx",
+        "ui/src/pages/Spend/ModelTable.tsx"
+      ],
+      "specRef": "f6-controlar.md#F6.3.T2",
+      "comments": []
+    },
+    {
+      "id": "F6.4.T1",
+      "phase": 6,
+      "title": "Ajustes: navegación, proveedores, agentes y almacenamiento",
+      "description": "Construir la cáscara de Ajustes con su navegación lateral de siete secciones\n(FR-41), donde cada una es alcanzable en un clic desde cualquier otra, y las\ntres primeras.\n\n**Proveedores**: el origen de los secretos —llavero, archivo, gestor externo—\nsegún lo que reporte `secrets_list`, y la lista de proveedores reusando el\ncomponente de F2.3.T1. El texto de seguridad tiene que decir la verdad sobre\ndónde quedaron guardadas en esta máquina, no repetir el texto del diseño si el\nrespaldo está en uso.\n\n**Agentes**: elección del agente detectado por F5.1.T1, binario, modelo, modo de\npermisos y directorio de trabajo, que tiene que ser visible y modificable\n(FR-38).\n\n**Almacenamiento**: carpeta de assets, configurable y abrible desde la app\n(FR-46), con el selector de directorio nativo.\n\nDone when: las siete secciones son navegables, cambiar la carpeta de assets hace\nque las generaciones nuevas aterricen ahí, y el directorio de trabajo del agente\nse ve y se cambia.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Tres secciones sobre componentes y comandos ya construidos.",
+      "status": "backlog",
+      "dependencies": [
+        "F2.3.T1",
+        "F5.1.T1"
+      ],
+      "estimateHours": 4.0,
+      "files": [
+        "ui/src/pages/Settings/index.tsx",
+        "ui/src/pages/Settings/Providers.tsx",
+        "ui/src/pages/Settings/Agents.tsx",
+        "ui/src/pages/Settings/Storage.tsx"
+      ],
+      "specRef": "f6-controlar.md#F6.4.T1",
+      "comments": []
+    },
+    {
+      "id": "F6.4.T2",
+      "phase": 6,
+      "title": "Ajustes: servidor, presupuesto, apariencia y avanzado",
+      "description": "Las cuatro secciones restantes.\n\n**Servidor y API**: estado, reinicio y detención con los comandos de F1.3.T3;\nhost y puerto; exposición en la red local, que exige acción explícita y muestra\nla advertencia de que otros equipos generarían con las llaves del usuario\n(FR-42); llave del API regenerable; y el interruptor del endpoint compatible con\nOpenAI con el ejemplo de código copiable (FR-43).\n\n**Presupuesto**: tope diario y umbral de confirmación de F3.2.T1, con el\nmedidor del día.\n\n**Apariencia**: tema que sigue al sistema y se puede forzar (FR-47), acento,\ndensidad, tipografía y reducción de movimiento. Sólo el tema oscuro tiene\nvalores; los otros dos quedan visibles pero deshabilitados con su motivo, que es\nlo que el A7 del PRD reconoce como deuda de diseño.\n\n**Avanzado**: reintentos y tiempo de espera, migración desde Da Vinci reusando\nF2.2.T2, nivel de registro, y la zona de peligro con la confirmación escrita de\nF4.3.T1.\n\nDone when: exponer en la red exige confirmación y deja el servidor accesible con\nla llave; apagar el endpoint compatible hace que `/v1` deje de responder; y\ncambiar el tema del sistema con la app abierta la hace acompañar.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Cuatro secciones que atan comandos y configuración ya existentes; la exposición en red es la única con filo de seguridad.",
+      "status": "backlog",
+      "dependencies": [
+        "F6.4.T1",
+        "F1.3.T3",
+        "F3.2.T1",
+        "F4.3.T1"
+      ],
+      "estimateHours": 4.0,
+      "files": [
+        "ui/src/pages/Settings/Server.tsx",
+        "ui/src/pages/Settings/Budget.tsx",
+        "ui/src/pages/Settings/Appearance.tsx",
+        "ui/src/pages/Settings/Advanced.tsx"
+      ],
+      "specRef": "f6-controlar.md#F6.4.T2",
+      "comments": []
+    },
+    {
+      "id": "F7.1.T1",
+      "phase": 7,
+      "title": "Ícono de aplicación por plataforma",
+      "description": "Generar los íconos desde el concepto elegido en el tablero de identidad de\n`docs/layout.pen`: `01 · Luz`, el disco con rayos.\n\nEl diseño lo entrega **sin fondo**, asumiendo que macOS le aplica el squircle.\nWindows y Linux no hacen eso, y ese es exactamente el hueco que la Q4 del PRD\ndejó abierto: hay que producir la variante con fondo propio para esas dos\nplataformas, usando la paleta de la marca —hueso sobre tinta, o sepia sobre\ntinta— sin degradés, según las reglas del ícono del propio tablero.\n\nProducir los formatos que cada sistema espera: `.icns` para macOS, `.ico`\nmulti-resolución para Windows, y PNG de 32 a 1024 para Linux y el empaquetado.\nVerificar que se lee a 16 px, que es el criterio con el que el diseño eligió\neste concepto sobre los otros dos.\n\nDone when: `cargo tauri build` toma los íconos sin advertencias, la app muestra\nel suyo en el Dock, la barra de tareas y el lanzador de cada sistema, y a 16 px\nla forma sigue siendo reconocible.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Producción de assets con una decisión de diseño pendiente que hay que resolver para dos plataformas.",
+      "status": "backlog",
+      "dependencies": [],
+      "estimateHours": 2.5,
+      "files": [
+        "src-tauri/icons/",
+        "scripts/make-icons.mjs"
+      ],
+      "specRef": "f7-distribuir.md#F7.1.T1",
+      "comments": []
+    },
+    {
+      "id": "F7.2.T1",
+      "phase": 7,
+      "title": "Compilación para los tres sistemas e integración continua",
+      "description": "Armar el flujo que produce los instaladores: `.dmg` para macOS en sus dos\narquitecturas, `.msi` para Windows y `.AppImage` para Linux.\n\nEl flujo tiene que correr `scripts/fetch-node.mjs` para el triple que\ncorresponda antes de compilar, construir la interfaz, y empaquetar. En\nintegración continua, una matriz por sistema operativo.\n\n**Medir el peso del resultado y fallar si supera los 150 MB.** El NFR-12 es un\nlímite, no una aspiración, y el riesgo declarado en el arch es justo este: el\nbinario de Node ronda los 110 MB sin comprimir. Si no entra, la salida es\nrecortar el binario de Node, no rehacer la arquitectura.\n\nDeclarar en la documentación la distribución de Linux de referencia para la v1,\nporque las dependencias de WebKitGTK varían entre distribuciones.\n\nDone when: el flujo produce los cuatro artefactos, cada uno abre en su sistema,\ny la verificación de peso está automatizada y pasa.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Integración continua con matriz de sistemas operativos y una verificación de peso que puede obligar a ajustar el empaquetado.",
+      "status": "backlog",
+      "dependencies": [
+        "F1.3.T2",
+        "F7.1.T1"
+      ],
+      "estimateHours": 4.0,
+      "files": [
+        ".github/workflows/release.yml",
+        "src-tauri/tauri.conf.json"
+      ],
+      "specRef": "f7-distribuir.md#F7.2.T1",
+      "comments": []
+    },
+    {
+      "id": "F7.3.T1",
+      "phase": 7,
+      "title": "Actualizador firmado",
+      "description": "Activar `tauri-plugin-updater` con clave propia generada por\n`cargo tauri signer generate`, según la decisión D7 del arch.\n\nEsta firma es **gratis y distinta** del notarizado de Apple y del certificado de\nWindows: el A3 del PRD descarta lo segundo, no esto. La clave privada nunca va\nal repositorio; viaja como secreto de integración continua. El endpoint de\nactualización tiene que ser HTTPS — el actualizador rechaza cualquier otra cosa.\n\nPublicar el archivo de manifiesto con el formato que el actualizador espera, y\nsumar al flujo de F7.2.T1 la generación de las firmas de cada artefacto.\n\nDone when: una versión instalada detecta una versión nueva publicada en el\nendpoint, la descarga verificando la firma, y se actualiza; y un artefacto con\nfirma alterada es rechazado.",
+      "model": "claude/claude-sonnet-5",
+      "reason": "Configuración con un camino conocido, pero la verificación de firma tiene que probarse de verdad, incluido el caso negativo.",
+      "status": "backlog",
+      "dependencies": [
+        "F7.2.T1"
+      ],
+      "estimateHours": 3.0,
+      "files": [
+        "src-tauri/tauri.conf.json",
+        "src-tauri/Cargo.toml",
+        ".github/workflows/release.yml"
+      ],
+      "specRef": "f7-distribuir.md#F7.3.T1",
+      "comments": []
+    },
+    {
+      "id": "F7.3.T2",
+      "phase": 7,
+      "title": "Rebrand y documentación de instalación",
+      "description": "Cerrar el rebrand total a Reverón que fija el A1 del PRD y escribir lo que el\nA3 obliga a explicar.\n\nEl rebrand alcanza al nombre del paquete, el ejecutable del CLI, la skill, los\narchivos de README en sus tres idiomas y el registro de cambios. Da Vinci queda\ncomo nombre histórico; la única referencia que sobrevive es la migración de la\nbiblioteca vieja.\n\nLa documentación de instalación es la parte que importa: **por cada sistema\noperativo, cómo autorizar una app sin notarizar.** Gatekeeper en macOS,\nSmartScreen en Windows, permisos de ejecución en Linux. Con capturas o con los\npasos exactos, no con un enlace a documentación ajena. El usuario se encuentra\ncon esto antes de ver el producto, y es lo que la Q3 del PRD dejó anotado para\nrevisar con datos de la primera descarga.\n\nDone when: ningún archivo del proyecto presenta el producto como Da Vinci salvo\ndonde se habla de la migración, y la página de descarga explica los tres\ncaminos de autorización con sus pasos.",
+      "model": "claude/claude-haiku-4-5",
+      "reason": "Renombrado mecánico y redacción de instrucciones; no hay decisiones de diseño pendientes.",
+      "status": "backlog",
+      "dependencies": [
+        "F7.3.T1"
       ],
       "estimateHours": 3.0,
       "files": [
         "README.md",
-        "SKILL.md",
+        "README.pt.md",
+        "README.es.md",
         "docs/SKILL.md",
-        "CHANGELOG.md",
-        "package.json"
+        "package.json",
+        "CHANGELOG.md"
       ],
-      "specRef": "f5-providers-spend.md#F5.3.T1",
-      "comments": []
-    },
-    {
-      "id": "F5.3.T2",
-      "phase": 5,
-      "title": "README en portugués",
-      "description": "Actualizar `README.pt.md` para que tenga el mismo contenido y estructura\nque el `README.md` actualizado en F5.3.T1, traducido al portugués de\nBrasil.\n\nDone when: las secciones y bloques de código de `README.pt.md` coinciden uno\na uno con los de `README.md`.",
-      "model": "claude/claude-haiku-4-5",
-      "reason": "Traducción.",
-      "status": "backlog",
-      "dependencies": [
-        "F5.3.T1"
-      ],
-      "estimateHours": 1.0,
-      "files": [
-        "README.pt.md"
-      ],
-      "specRef": "f5-providers-spend.md#F5.3.T2",
+      "specRef": "f7-distribuir.md#F7.3.T2",
       "comments": []
     }
   ]
