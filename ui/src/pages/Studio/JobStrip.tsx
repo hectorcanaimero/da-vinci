@@ -4,9 +4,16 @@ import { Link } from 'react-router-dom';
 import { loadActiveJobs, useJobs, useServerEvents } from '../../sse';
 import type { JobStatus } from '../../types';
 
-const LABEL: Record<JobStatus, string> = { queued: 'en cola', running: 'generando', done: 'listo', failed: 'error' };
+// `interrupted` y `discarded` los agrego F6.1.T1: un trabajo que quedo a
+// medias al cerrar la app es recuperable, no fallido, y el texto no puede
+// afirmar que no se cobro (FR-27).
+const LABEL: Record<JobStatus, string> = {
+  queued: 'en cola', running: 'generando', done: 'listo', failed: 'error',
+  interrupted: 'interrumpido', discarded: 'descartado',
+};
 const BAR_COLOR: Record<JobStatus, string> = {
   queued: 'var(--border)', running: 'var(--accent)', done: 'var(--ok)', failed: 'var(--danger)',
+  interrupted: 'var(--warn)', discarded: 'var(--text-muted)',
 };
 
 // ponytail: Canvas already keeps an SSE connection open on this page; this

@@ -25,6 +25,12 @@ jobs:
         run: npm run lint
       - name: Test
         run: npm test
+      # `npm run lint` es `node --check`: no mira TypeScript. Sin este paso,
+      # dos PRs verdes por separado pueden romper main al juntarse — ya paso
+      # con F6.1.T1 (agrego los estados interrupted/discarded) y F3.1.T2 (cuyo
+      # mapa de etiquetas cubria solo los cuatro viejos).
+      - name: Typecheck UI
+        run: npm run build:ui
 
   rust:
     name: rust (cargo)

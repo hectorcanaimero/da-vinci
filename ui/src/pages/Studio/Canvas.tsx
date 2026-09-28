@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { deleteGeneration, getGeneration, setFavorite } from '../../api';
 import AssetViewer from '../../components/viewers';
 import { useJobs, useServerEvents } from '../../sse';
-import type { Generation } from '../../types';
+import type { Generation, JobStatus } from '../../types';
 
 const icon = (children: ReactNode) => (
   <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}
@@ -22,7 +22,13 @@ const ICONS = {
 
 const basename = (path: string) => path.split(/[\\/]/).pop() ?? path;
 const usd = (n: number) => `$${n.toFixed(3)}`;
-const STATUS_LABEL = { queued: 'En cola', running: 'Generando…', done: 'Listo', failed: 'Falló' } as const;
+// `interrupted` no dice que no se cobro, sólo que quedo a medias: el FR-27
+// deja la decision de reanudar en el usuario, y el texto tiene que ser igual
+// de honesto.
+const STATUS_LABEL: Record<JobStatus, string> = {
+  queued: 'En cola', running: 'Generando…', done: 'Listo', failed: 'Falló',
+  interrupted: 'Interrumpido', discarded: 'Descartado',
+};
 
 export default function Canvas({ jobId }: { jobId: string | null }) {
   const [gen, setGen] = useState<Generation | null>(null);
