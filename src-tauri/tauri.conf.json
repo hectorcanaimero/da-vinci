@@ -24,6 +24,7 @@
     ]
   },
   "bundle": {
+    "targets": ["dmg", "msi", "appimage"],
     "externalBin": ["binaries/node"],
     "resources": ["../src/**/*", "../dist/ui/**/*", "../package.json"],
     "icon": [
