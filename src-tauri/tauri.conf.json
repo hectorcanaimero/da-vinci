@@ -33,6 +33,15 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEI0QzgxNUU2N0I1OTZCMzIKUldReWExbDc1aFhJdE9xWUhFa1NYT2ZqaFVkRFk3czRnZ0wrWFUxeDR1NEx6Ukdibm0zaU1DOEQK",
+      "endpoints": [
+        "https://github.com/hectorcanaimero/da-vinci/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

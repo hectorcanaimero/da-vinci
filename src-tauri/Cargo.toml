@@ -13,6 +13,9 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
+# D7: actualizador firmado con clave propia (cargo tauri signer generate),
+# no tiene nada que ver con el notarizado de Apple ni el certificado de Windows.
+tauri-plugin-updater = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # keyring 3, no 4: la 4.x se reescribió sobre keyring-core y cambió el modelo de
