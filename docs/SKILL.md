@@ -1,9 +1,9 @@
 ---
-name: da-vinci
+name: reveron
 description: >
   Genera imágenes, SVG, videos, GIF, audio y modelos 3D (GLB) eligiendo el mejor modelo por caso y respetando umbrales de costo.
   Usa OpenAI (gpt-image-1/2), Gemini (Nano-Banana, Imagen 4, Veo 3), FAL (FLUX, Recraft, Kling, Ideogram), KIE (gateway Sora/MJ/Kling), HeyGen (avatar + HyperFrames), ElevenLabs (TTS + SFX), Tripo3D (texto/imagen → modelo 3D GLB).
-  Trigger: usuario invoca "Da Vinci", pide generar imagen/video/svg/gif/logo/banner/hero/thumbnail/avatar/tts/voz/audio/sfx/modelo 3D/GLB, o cuando cualquier proyecto necesita assets visuales o 3D.
+  Trigger: usuario invoca "Reverón", pide generar imagen/video/svg/gif/logo/banner/hero/thumbnail/avatar/tts/voz/audio/sfx/modelo 3D/GLB, o cuando cualquier proyecto necesita assets visuales o 3D.
 license: Apache-2.0
 metadata:
   author: gentleman-programming
@@ -12,7 +12,7 @@ metadata:
 
 ## When to Use
 
-- Usuario pide explícitamente "Da Vinci" o menciona el skill por nombre
+- Usuario pide explícitamente "Reverón" o menciona el skill por nombre
 - Usuario pide crear/generar/hacer una imagen, video, SVG, GIF, logo, banner, hero, thumbnail
 - Usuario pide un asset visual para su proyecto (landing, RRSS, presentación, mockup)
 - Usuario pide editar una imagen existente (cambiar fondo, inpaint, character swap)
@@ -23,19 +23,19 @@ metadata:
 
 ## Global Library
 
-**Toda generación queda guardada en la biblioteca global** (`~/.davinci/`), no solo en el proyecto local. Esto significa:
+**Toda generación queda guardada en la biblioteca global** (`~/.reveron/`), no solo en el proyecto local. Esto significa:
 
 - Accedé a tus assets desde cualquier proyecto
 - Usá generaciones previas como referencias en nuevas generaciones
-- Consultá costo total y tendencias desde el dashboard (`davinci serve`)
-- Exportá o buscá en `davinci import` desde manifestos de proyectos anteriores
+- Consultá costo total y tendencias desde el dashboard (`reveron serve`)
+- Exportá o buscá en `reveron import` desde manifestos de proyectos anteriores
 
-Use `--refs davinci:<id>` para referenciar un asset guardado:
+Use `--refs reveron:<id>` para referenciar un asset guardado:
 
 ```bash
-davinci image --provider gemini --model nano-banana \
+reveron image --provider gemini --model nano-banana \
   --prompt "misma pose pero en la playa" \
-  --refs davinci:84ac4a32-5c48-4f8e-8f4c-a8f8c8f8c8f8
+  --refs reveron:84ac4a32-5c48-4f8e-8f4c-a8f8c8f8c8f8
 ```
 
 Ideal para iteración: cambios de estilo, character consistency, refinamientos sobre trabajo anterior.
@@ -105,69 +105,69 @@ Toda generación queda en `<cwd>/assets/generated/manifest.json`. El helper lo h
 ```bash
 # ── Imagen ──────────────────────────────────────────────────────
 # Default (flux-pro-ultra, calidad premium)
-node ~/.claude/skills/da-vinci/scripts/generate.mjs image \
+reveron image \
   --provider fal --model flux-pro-ultra \
   --prompt "..." --aspect 16:9
 
 # Rápida y barata (flux-schnell, para iterar)
-node .../generate.mjs image --provider fal --model flux-schnell --prompt "..."
+reveron image --provider fal --model flux-schnell --prompt "..."
 
 # Con edición desde referencia (Nano-Banana)
-node .../generate.mjs image \
+reveron image \
   --provider gemini --model nano-banana \
   --prompt "cambiá el fondo a un bosque" \
   --refs "https://ejemplo.com/original.png"
 
 # Texto legible en imagen
-node .../generate.mjs image --provider fal --model ideogram-v3 \
+reveron image --provider fal --model ideogram-v3 \
   --prompt "poster que dice 'AgendaZap' en tipografía moderna"
 
 # ── SVG (siempre FAL Recraft V3 SVG) ────────────────────────────
-node .../generate.mjs svg --prompt "logo minimalista para una clínica"
+reveron svg --prompt "logo minimalista para una clínica"
 
 # ── Video ───────────────────────────────────────────────────────
 # Default (kling-1.6-pro, ~$0.42 por 5s)
-node .../generate.mjs video --provider fal --model kling-1.6-pro \
+reveron video --provider fal --model kling-1.6-pro \
   --prompt "café siendo servido, cinemático" --duration 5
 
 # Con audio sincronizado (Veo 3, requiere --force por costo)
-node .../generate.mjs video --provider gemini --model veo-3 \
+reveron video --provider gemini --model veo-3 \
   --prompt "..." --duration 5 --force
 
 # Fast + barato (Veo 3 Fast)
-node .../generate.mjs video --provider gemini --model veo-3-fast \
+reveron video --provider gemini --model veo-3-fast \
   --prompt "..." --duration 5
 
 # ── Modelo 3D / GLB (Tripo3D) ───────────────────────────────────
 # Desde texto
-node .../generate.mjs model-3d --prompt "una espada medieval low poly" \
+reveron model-3d --prompt "una espada medieval low poly" \
   --texture true --pbr true
 
 # Desde imagen de referencia (image-to-model)
-node .../generate.mjs model-3d --refs "https://ejemplo.com/producto.png"
+reveron model-3d --refs "https://ejemplo.com/producto.png"
 
 # Sin textura (más barato, solo geometría)
-node .../generate.mjs model-3d --prompt "silla moderna minimalista" --texture false
+reveron model-3d --prompt "silla moderna minimalista" --texture false
 
 # ── Avatar hablando (HeyGen) ────────────────────────────────────
-node .../generate.mjs list-avatars                        # ver IDs disponibles
-node .../generate.mjs list-voices --provider heygen       # ver voices
-node .../generate.mjs avatar-video \
+reveron list-avatars                        # ver IDs disponibles
+reveron list-voices --provider heygen       # ver voices
+reveron avatar-video \
   --avatar "AVATAR_ID" --voice "VOICE_ID" \
-  --script "Hola, soy Da Vinci..."
+  --script "Hola, soy Reverón..."
 
 # ── TTS + SFX (ElevenLabs) ──────────────────────────────────────
-node .../generate.mjs list-voices --provider elevenlabs
-node .../generate.mjs tts --text "..." --voice "VOICE_ID" --model multilingual-v2
-node .../generate.mjs sfx --text "explosión épica" --duration 3
+reveron list-voices --provider elevenlabs
+reveron tts --text "..." --voice "VOICE_ID" --model multilingual-v2
+reveron sfx --text "explosión épica" --duration 3
 
 # ── Post-processing ─────────────────────────────────────────────
-node .../generate.mjs bg-remove --image "URL"
-node .../generate.mjs upscale --image "URL" --model clarity
+reveron bg-remove --image "URL"
+reveron upscale --image "URL" --model clarity
 
 # ── Costo pre-flight ────────────────────────────────────────────
 # Agregá --dry-run para SOLO estimar sin ejecutar
-node .../generate.mjs video --provider fal --model kling-2.1-master \
+reveron video --provider fal --model kling-2.1-master \
   --prompt "..." --duration 10 --dry-run
 ```
 
@@ -176,7 +176,7 @@ node .../generate.mjs video --provider fal --model kling-2.1-master \
 ### Cuando el usuario pide un hero image
 
 ```
-Usuario: "Da Vinci, necesito un hero para una landing de clínica dental, moderna"
+Usuario: "Reverón, necesito un hero para una landing de clínica dental, moderna"
 
 Claude debe:
 1. Detectar intent: image, hero de landing → premium quality
@@ -231,8 +231,8 @@ Cuando salga un modelo que no está en el registry (los proveedores actualizan r
 
 ## Resources
 
-- **Router CLI**: `scripts/generate.mjs`
-- **Providers**: `scripts/providers/{fal,openai,gemini,kie,heygen,elevenlabs,tripo}.mjs`
-- **Utils**: `scripts/utils/{infisical,cost-estimator,reference-loader,manifest}.mjs`
+- **Router CLI**: `src/generate.mjs`
+- **Providers**: `src/providers/{fal,openai,gemini,kie,heygen,elevenlabs,tripo}.mjs`
+- **Utils**: `src/utils/{infisical,cost-estimator,reference-loader,manifest}.mjs`
 - **Matriz de decisión**: [references/model-matrix.md](references/model-matrix.md)
 - **Setup + Troubleshooting**: [README.md](README.md)
