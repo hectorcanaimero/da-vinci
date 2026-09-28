@@ -1,12 +1,13 @@
 # Changelog
 
-All notable changes to Da Vinci are documented here.
+All notable changes to Reverón are documented here.
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [2.0.0] — 2026-09-25
 
 ### Breaking Changes
 - **Node ≥ 22.13.0 required** (previously 18+). See `package.json` `engines` field.
+- **Package renamed from `da-vinci` to `reveron`**. CLI command is now `reveron` (was `davinci`). Config moved to `~/.reveron/` (was `~/.davinci/`). Old manifests can be imported via `reveron import ./assets/generated/manifest.json`.
 
 ### Added
 - **Local dashboard + API server**: `davinci serve` opens UI at `http://127.0.0.1:20130` with Studio, Library, Providers, Spend sections
@@ -19,9 +20,9 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), [SemVer](https
 - Comprehensive README sections: installation, dashboard, API, library, import command
 
 ### Changed
-- CLI commands now use global script (`davinci` instead of `node src/generate.mjs`)
+- CLI commands now use global script (`reveron` instead of `node src/generate.mjs`)
 - Library stored in SQLite instead of flat JSON manifests
-- Config location: `~/.davinci/config.json` (instead of `~/.config/da-vinci/.env` — that's still supported)
+- Config location: `~/.reveron/config.json` (instead of `~/.config/reveron/.env` — that's still supported)
 
 ### Technical
 - `src/server/` — HTTP server + route handlers

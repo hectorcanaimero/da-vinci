@@ -1,17 +1,17 @@
 <div align="center">
 
-# 🎨 Da Vinci
+# 🎨 Reverón
 
 **Generate images, SVG, videos, audio, and 3D models — one skill, seven providers, smart routing.**
 
 A Claude Code skill (and standalone CLI) that orchestrates OpenAI, Google Gemini, FAL, KIE, HeyGen, ElevenLabs, and Tripo3D — automatically picking the best model per use case with cost gating built in.
 
 [![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-[![Node](https://img.shields.io/badge/Node-%E2%89%A518-brightgreen)](package.json)
+[![Node](https://img.shields.io/badge/Node-%E2%89%A522-brightgreen)](package.json)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)](CONTRIBUTING.md)
-[![Website](https://img.shields.io/badge/website-live-6366f1)](https://davinci.guria.lat)
+[![Website](https://img.shields.io/badge/website-live-6366f1)](https://reveron.guria.lat)
 
-[Website](https://davinci.guria.lat) · [Setup](#setup) · [Model Matrix](docs/references/model-matrix.md) · [Contributing](CONTRIBUTING.md)
+[Website](https://reveron.guria.lat) · [Setup](#setup) · [Model Matrix](docs/references/model-matrix.md) · [Contributing](CONTRIBUTING.md)
 
 [Português](README.pt.md) · [Español](README.es.md)
 
@@ -21,7 +21,7 @@ A Claude Code skill (and standalone CLI) that orchestrates OpenAI, Google Gemini
 
 ## Gallery
 
-Real examples generated end-to-end via Da Vinci:
+Real examples generated end-to-end via Reverón:
 
 <table>
 <tr>
@@ -47,16 +47,16 @@ Real examples generated end-to-end via Da Vinci:
 
 ---
 
-## Why Da Vinci?
+## Why Reverón?
 
-You're a developer building a landing page. You need a hero image, a logo, and a short video. Without Da Vinci, you'd:
+You're a developer building a landing page. You need a hero image, a logo, and a short video. Without Reverón, you'd:
 
 - Compare pricing across 5+ providers
 - Pick the wrong model for the job (spending too much or getting mediocre results)
 - Manage 6 different API clients + auth flows
 - Manually track what you spent
 
-**With Da Vinci, Claude does all that for you.** You say "make me a hero image for a dental clinic landing", it picks the best model, estimates cost, generates, saves to `assets/generated/`, and logs it to `manifest.json`.
+**With Reverón, Claude does all that for you.** You say "make me a hero image for a dental clinic landing", it picks the best model, estimates cost, generates, saves to `assets/generated/`, and logs it to `manifest.json`.
 
 ### Highlights
 
@@ -90,21 +90,84 @@ Full matrix with use cases and costs: [`docs/references/model-matrix.md`](docs/r
 ### Global (recommended)
 
 ```bash
-npm install -g da-vinci
-davinci --help
-davinci serve                # starts dashboard + API at http://127.0.0.1:20130
+npm install -g reveron
+reveron --help
+reveron serve                # starts dashboard + API at http://127.0.0.1:20130
 ```
 
 ### Local (development)
 
 ```bash
-git clone https://github.com/hectorcanaimero/da-vinci.git
-cd da-vinci
+git clone https://github.com/hectorcanaimero/reveron.git
+cd reveron
 npm ci && npm run build:ui
 npm run install:setup        # interactive setup
 node src/generate.mjs --help
 npm start image --provider fal --model flux-schnell --prompt "test" --dry-run
 ```
+
+## Authorization (First Run)
+
+Reverón is distributed **without notarization** to eliminate friction. Depending on your OS, you'll need to authorize it once:
+
+### macOS — Gatekeeper
+
+When you first run `reveron`, you'll see: _"reveron cannot be opened because the developer cannot be verified."_
+
+**Steps:**
+
+1. Go to **System Settings → Privacy & Security** (or **System Preferences → Security & Privacy** on older macOS)
+2. Scroll down to find the message about **reveron** being blocked
+3. Click **Open Anyway** (you may need to authenticate with your password)
+4. The app will launch and you'll be able to use it going forward
+
+Alternatively, from the command line:
+```bash
+xattr -d com.apple.quarantine /usr/local/lib/node_modules/reveron/src/generate.mjs
+```
+
+**Why:** Apple's Gatekeeper requires paid Developer certificates. We skip that cost and let you authorize once instead.
+
+### Windows — SmartScreen
+
+Windows may show: _"Windows protected your PC"_ and block the download or execution.
+
+**Steps:**
+
+1. If the download is blocked:
+   - Open **Downloads** folder, right-click the `.msi` file
+   - Click **Properties** → **General** (bottom area)
+   - Check **Unblock** and click **Apply**
+
+2. If the installation is blocked by SmartScreen:
+   - Click **More info** on the security prompt
+   - Click **Run anyway** (requires no additional authentication)
+
+3. After installation, the app will work normally
+
+**Why:** Windows SmartScreen checks if apps have been seen by millions of users. New apps require explicit user authorization.
+
+### Linux — Executable Permissions
+
+On Linux, you'll need to mark the AppImage as executable:
+
+```bash
+chmod +x reveron-*.AppImage
+./reveron-*.AppImage
+```
+
+Or from your package manager (if available):
+```bash
+# Ubuntu/Debian
+sudo apt-get install ./reveron-*.deb
+
+# Fedora/RHEL
+sudo dnf install ./reveron-*.rpm
+```
+
+**Supported Distribution:** Reverón v2.0 targets **Ubuntu 20.04 LTS and later** due to WebKitGTK dependencies. Other distributions (Fedora, Arch, openSUSE) require manual WebKitGTK installation. For details, see your distro's package manager.
+
+**Why:** Linux requires explicit executable permissions by design. After that first step, the AppImage runs without further authorization.
 
 ## Setup
 
@@ -113,10 +176,10 @@ Choose ONE option for API keys:
 ### Option A — `.env` file (simplest)
 
 ```bash
-mkdir -p ~/.config/da-vinci
-cp .env.example ~/.config/da-vinci/.env
+mkdir -p ~/.config/reveron
+cp .env.example ~/.config/reveron/.env
 # edit the file and add your API keys (all optional)
-chmod 600 ~/.config/da-vinci/.env
+chmod 600 ~/.config/reveron/.env
 ```
 
 Get keys from: [OpenAI](https://platform.openai.com/api-keys) · [Gemini](https://aistudio.google.com/apikey) · [FAL](https://fal.ai/dashboard/keys) · [KIE](https://kie.ai) · [HeyGen](https://app.heygen.com/settings?nav=API) · [ElevenLabs](https://elevenlabs.io/app/settings/api-keys) · [Tripo3D](https://platform.tripo3d.ai/api-keys)
@@ -129,11 +192,11 @@ If you use [Infisical](https://infisical.com) (self-hosted or cloud), add to `~/
 export INFISICAL_URL="https://your-infisical.com"
 export INFISICAL_CLIENT_ID="..."
 export INFISICAL_CLIENT_SECRET="..."
-export DAVINCI_PROJECT_ID="..."
-export DAVINCI_ENV="prod"
+export REVERON_PROJECT_ID="..."
+export REVERON_ENV="prod"
 ```
 
-Da Vinci auto-detects and fetches API keys via Infisical Universal Auth. See [`docs/references/infisical-setup.md`](docs/references/model-matrix.md) for the full guide.
+Reverón auto-detects and fetches API keys via Infisical Universal Auth. See [`docs/references/infisical-setup.md`](docs/references/model-matrix.md) for the full guide.
 
 ### Option C — Direct environment variables (CI/CD)
 
@@ -148,7 +211,7 @@ Perfect for GitHub Actions, Docker, or scripts.
 ### Verify
 
 ```bash
-davinci image --provider fal --model flux-schnell --prompt "test" --dry-run --verbose
+reveron image --provider fal --model flux-schnell --prompt "test" --dry-run --verbose
 # Output: 🔑 Secretos cargados desde: dotenv (...) — keys: ...
 ```
 
@@ -171,50 +234,50 @@ Claude reads [`docs/SKILL.md`](docs/SKILL.md), picks the model, estimates cost, 
 
 ```bash
 # Photorealistic image
-node src/generate.mjs image \
+reveron image \
   --provider fal --model flux-pro-ultra \
   --prompt "..." --aspect 16:9
 
 # SVG vector (always FAL Recraft V3)
-node src/generate.mjs svg --prompt "minimalist logo for a clinic"
+reveron svg --prompt "minimalist logo for a clinic"
 
 # Edit with reference (Nano-Banana — best for character consistency)
-node src/generate.mjs image \
+reveron image \
   --provider gemini --model nano-banana \
   --prompt "same character but with a beach background" \
   --refs "https://example.com/character.png"
 
 # Video with sync audio (Veo 3 — requires --force due to cost)
-node src/generate.mjs video \
+reveron video \
   --provider gemini --model veo-3 \
   --prompt "..." --duration 5 --force
 
 # Text-to-speech
-node src/generate.mjs tts \
+reveron tts \
   --text "Welcome to AgendaZap" \
   --voice "21m00Tcm4TlvDq8ikWAM"
 
 # 3D model (GLB) from text — Tripo3D
-node src/generate.mjs model-3d --prompt "a low poly medieval sword"
+reveron model-3d --prompt "a low poly medieval sword"
 
 # 3D model (GLB) from a reference image — Tripo3D
-node src/generate.mjs model-3d --refs "https://example.com/product.png"
+reveron model-3d --refs "https://example.com/product.png"
 
 # List available voices
-node src/generate.mjs list-voices --provider elevenlabs
+reveron list-voices --provider elevenlabs
 
 # Estimate cost only (dry-run)
-node src/generate.mjs video --provider fal --model kling-2.1-master \
+reveron video --provider fal --model kling-2.1-master \
   --prompt "..." --dry-run
 ```
 
-Full command reference: `node src/generate.mjs --help`
+Full command reference: `reveron --help`
 
 ---
 
-## Dashboard (`davinci serve`)
+## Dashboard (`reveron serve`)
 
-Start with `davinci serve` to open the local dashboard at `http://127.0.0.1:20130`.
+Start with `reveron serve` to open the local dashboard at `http://127.0.0.1:20130`.
 
 ### Four Sections
 
@@ -242,11 +305,11 @@ All routes require optional **API key** (for network exposure). Set in config:
 }
 ```
 
-Then use `X-Davinci-API-Key` header:
+Then use `X-Reveron-API-Key` header:
 
 ```bash
 curl http://<host>:20130/api/health \
-  -H "X-Davinci-API-Key: sk-..."
+  -H "X-Reveron-API-Key: sk-..."
 ```
 
 ### API Routes
@@ -300,14 +363,14 @@ curl http://127.0.0.1:20130/v1/images/generations \
 
 ---
 
-## Global Library (`~/.davinci/`)
+## Global Library (`~/.reveron/`)
 
 Every generation is saved to the global library (database + files). Use via CLI or dashboard.
 
 ### Directory Structure
 
 ```
-~/.davinci/
+~/.reveron/
 ├── config.json              Your settings (port, host, apiKey, budget, etc.)
 ├── orch.db                  SQLite database (generations, lineage, favorites)
 └── assets/
@@ -320,12 +383,12 @@ Every generation is saved to the global library (database + files). Use via CLI 
 
 ### Reference Generations in Prompts
 
-Use `--refs davinci:<id>` to reference a saved generation:
+Use `--refs reveron:<id>` to reference a saved generation:
 
 ```bash
-davinci image --provider gemini --model nano-banana \
+reveron image --provider gemini --model nano-banana \
   --prompt "same style but on a beach" \
-  --refs davinci:84ac4a32-5c48-4f8e-8f4c-a8f8c8f8c8f8
+  --refs reveron:84ac4a32-5c48-4f8e-8f4c-a8f8c8f8c8f8
 ```
 
 Useful for building on prior work (character consistency, style chaining, iterative refinement).
@@ -337,7 +400,7 @@ Useful for building on prior work (character consistency, style chaining, iterat
 Migrate from project-local manifests to the global library:
 
 ```bash
-davinci import ./assets/generated/manifest.json
+reveron import ./assets/generated/manifest.json
 # Output: { imported: 42, skipped: 3 }
 ```
 
@@ -362,11 +425,11 @@ Override thresholds by editing `src/utils/cost-estimator.mjs`.
 ## Project Structure
 
 ```
-da-vinci/
+reveron/
 ├── LICENSE                      Apache 2.0
 ├── README.md
 ├── package.json
-├── .env.example                 Template — copy to ~/.config/da-vinci/.env
+├── .env.example                 Template — copy to ~/.config/reveron/.env
 ├── .gitignore
 ├── SKILL.md                     → docs/SKILL.md (symlink)
 ├── src/
@@ -468,4 +531,10 @@ Apache License 2.0 — see [LICENSE](LICENSE).
 
 Built by **[Héctor Rodríguez](https://github.com/hectorcanaimero)** for [Claude Code](https://claude.ai/code).
 
-If Da Vinci saved you time or money, drop a ⭐ on the repo. It really helps.
+If Reverón saved you time or money, drop a ⭐ on the repo. It really helps.
+
+---
+
+### Historical Note
+
+Reverón was previously known as Da Vinci. The library continues to save to `~/.reveron/`, and your old project manifests can be imported via `reveron import ./assets/generated/manifest.json`.

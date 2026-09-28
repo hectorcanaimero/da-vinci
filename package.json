@@ -1,11 +1,11 @@
 {
-  "name": "da-vinci",
+  "name": "reveron",
   "version": "2.0.0",
   "description": "Universal visual generation skill for Claude Code — images, SVG, videos, audio, and 3D models via OpenAI, Gemini, FAL, KIE, HeyGen, ElevenLabs, and Tripo3D with smart cost gating.",
   "type": "module",
   "main": "src/generate.mjs",
   "bin": {
-    "davinci": "./src/generate.mjs"
+    "reveron": "./src/generate.mjs"
   },
   "engines": {
     "node": ">=22.13.0"
