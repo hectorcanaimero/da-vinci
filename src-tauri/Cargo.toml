@@ -23,3 +23,6 @@ keyring = { version = "3", features = [
   "sync-secret-service",
   "crypto-rust",
 ] }
+# Ya resuelta en el árbol de tauri (reqwest 0.13.5, ver Cargo.lock); acá sólo
+# se declara para usarla directo en la rotación en caliente de F2.1.T2.
+reqwest = { version = "0.13", features = ["json"] }
