@@ -136,6 +136,17 @@ pub fn run() {
             pick_directory,
             pick_files,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .setup(|app| {
+            // Arranca el servidor Node y espera su handshake (F1.3.T2).
+            sidecar::setup(app.handle());
+            Ok(())
+        })
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        // Primera defensa de D10: el sidecar muere con la app.
+        .run(|app, event| {
+            if let tauri::RunEvent::Exit = event {
+                sidecar::kill(app);
+            }
+        });
 }
