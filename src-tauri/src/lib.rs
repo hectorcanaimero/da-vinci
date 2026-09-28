@@ -145,8 +145,8 @@ fn platform_info() -> Result<platform::PlatformInfo, String> {
 }
 
 #[tauri::command]
-fn reveal_in_files(path: String) -> Result<(), String> {
-    Err(NOT_IMPLEMENTED.into())
+fn reveal_in_files(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    platform::reveal_in_files(&app, &path)
 }
 
 #[tauri::command]
@@ -180,6 +180,10 @@ pub fn run() {
         // D7: actualizador firmado con clave propia, verifica la firma de cada
         // artefacto antes de instalarlo (config en tauri.conf.json).
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // FR-24: "revelar" en Finder/Explorador/el gestor de archivos de Linux.
+        // Sólo se otorga reveal-item-in-dir (ver capabilities/default.json);
+        // el acotado a la carpeta de assets vive en platform::reveal_in_files.
+        .plugin(tauri_plugin_opener::init())
         .setup(|app| {
             // D9: macOS keeps native decorations (titleBarStyle: Overlay in
             // tauri.conf.json draws the traffic lights over our bar); Windows
