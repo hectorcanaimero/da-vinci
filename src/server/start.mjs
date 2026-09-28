@@ -29,7 +29,6 @@ export async function startServer({ port, host, open = true, cwd = process.cwd()
   if (host) config.host = host;
 
   const library = openLibrary();
-  library.jobs.failInterrupted();
   const manifest = join(cwd, 'assets', 'generated', 'manifest.json');
   if (existsSync(manifest)) await importManifest(manifest, library).catch(() => {});
 
