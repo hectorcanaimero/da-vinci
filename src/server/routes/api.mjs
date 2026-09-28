@@ -152,4 +152,49 @@ export const routes = [
     jobs.resumeQueue();
     send(200, { paused: false });
   } },
+
+  { method: 'GET', path: '/api/spend/export', handler(req, res, { query, library }) {
+    const csv = exportSpendCsv(library, query);
+    const timestamp = new Date().toISOString().split('T')[0];
+    res.writeHead(200, {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="gasto-${timestamp}.csv"`,
+    });
+    res.end(csv);
+  } },
 ];
+
+function escapeCsvField(value) {
+  if (value == null) return '';
+  const s = String(value);
+  if (/[,"\n\r]/.test(s)) {
+    return `"${s.replace(/"/g, '""')}"`;
+  }
+  return s;
+}
+
+function exportSpendCsv(library, { from, to } = {}) {
+  // ponytail: no pagination; if exports get huge, stream instead.
+  const items = [];
+  let cursor;
+  do {
+    const page = library.list({ from, to, cursor, limit: 500 });
+    items.push(...page.items);
+    cursor = page.nextCursor;
+  } while (cursor);
+
+  const header = ['fecha', 'tipo', 'proveedor', 'modelo', 'costo', 'prompt', 'id'];
+  const rows = items.map((g) => {
+    const promptTruncated = (g.prompt ?? '').slice(0, 200);
+    return [
+      g.createdAt,
+      g.kind,
+      g.provider,
+      g.model,
+      g.costUsd.toFixed(6),
+      promptTruncated,
+      g.id,
+    ].map(escapeCsvField).join(',');
+  });
+  return [header.join(','), ...rows].join('\n') + '\n';
+}
