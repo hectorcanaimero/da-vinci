@@ -22,7 +22,7 @@ function useNeedsOnboarding() {
       return;
     }
     listProviders()
-      .then((items) => setNeeds(!items.some((p) => p.connected)))
+      .then(({ items }) => setNeeds(!items.some((p) => p.status === 'connected')))
       .catch(() => setNeeds(false));
   }, []);
   return needs;
