@@ -1,3 +1,5 @@
+@import './styles/tokens.css';
+
 :root {
   --bg: #0f1115;
   --surface: #181b22;
@@ -56,3 +58,18 @@ h1 { font-size: var(--fs-lg); margin: 0 0 var(--sp-3); }
   .brand { display: none; }
   .main { margin-left: 0; padding-bottom: calc(var(--nav-h) + var(--sp-4)); }
 }
+
+#font-check {
+  background: var(--bg-app);
+  color: var(--text-primary);
+  margin-left: var(--nav-w);
+  padding: var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+#font-check .display { font-family: var(--font-display); font-weight: 600; font-size: 2rem; }
+#font-check .ui { font-family: var(--font-ui); font-weight: 400; }
+#font-check .ui strong { font-weight: 600; }
+#font-check .mono { font-family: var(--font-mono); font-weight: 400; }
+#font-check .mono strong { font-weight: 600; }
