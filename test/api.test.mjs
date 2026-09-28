@@ -129,3 +129,45 @@ test('spend con totalUsd e import', async () => {
   assert.deepEqual(imp.body, { imported: 1, skipped: 0 });
   assert.equal((await call('/api/import', { method: 'POST', body: {} })).status, 400);
 });
+
+test('spend/export: CSV con prompt con comas, comillas y saltos', async () => {
+  const filePath1 = join(dir, 'export-1.png');
+  const filePath2 = join(dir, 'export-2.png');
+  await writeFile(filePath1, 'test1');
+  await writeFile(filePath2, 'test2');
+
+  const prompt = 'Genera "código" con\nsaltos, de línea y más.';
+  const g1 = library.record({
+    kind: 'image', provider: 'fal', model: 'flux-pro', prompt,
+    filePath: filePath1, mime: 'image/png', source: 'test', costUsd: 0.05,
+  });
+  const g2 = library.record({
+    kind: 'image', provider: 'openai', model: 'dall-e-3', prompt: 'simple',
+    filePath: filePath2, mime: 'image/png', source: 'test', costUsd: 0.07,
+  });
+
+  const r = await fetch(`${base}/api/spend/export`, { method: 'GET' });
+  assert.equal(r.status, 200);
+  assert.equal(r.headers.get('content-type'), 'text/csv; charset=utf-8');
+  assert.ok(r.headers.get('content-disposition').includes('gasto-'));
+
+  const csv = await r.text();
+  const firstLine = csv.split('\n')[0];
+  assert.equal(firstLine, 'fecha,tipo,proveedor,modelo,costo,prompt,id');
+
+  // Verifica que ambas generaciones estén en el CSV con sus IDs
+  assert.ok(csv.includes(g1.id), `g1 id ${g1.id} should be in CSV`);
+  assert.ok(csv.includes(g2.id), `g2 id ${g2.id} should be in CSV`);
+
+  // Verifica que el prompt con caracteres especiales se escapó correctamente
+  // CSV escaping: quotes dentro del campo se duplican como ""
+  assert.ok(csv.includes('""código""'), 'prompt quotes should be escaped as ""');
+
+  // Verifica que ambos prompts aparecen en la salida
+  assert.ok(csv.includes('Genera'), 'first prompt content should appear in CSV');
+  assert.ok(csv.includes('simple'), 'second prompt should appear in CSV');
+
+  // Verifica que al menos 2 filas de generaciones existen (header + 2 gens mínimo)
+  const nonEmptyLines = csv.split('\n').filter((l) => l.trim());
+  assert.ok(nonEmptyLines.length >= 3, `should have at least header + 2 data rows, got ${nonEmptyLines.length}`);
+});
