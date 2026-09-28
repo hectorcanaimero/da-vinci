@@ -1,111 +1,98 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { ApiError, createGeneration, estimate, fileUrl, getGeneration, listModels } from '../../api';
-import AssetPicker, { Thumb, type PickedInput } from '../../components/AssetPicker';
-import { upsertJob, useJobs } from '../../sse';
-import type { Estimate, Generation, GenerationRequest, Kind, ModelInfo } from '../../types';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { ApiError, createGeneration, estimate, listModels } from '../../api';
+import ModelPicker from './ModelPicker';
+import Params, { type ParamValues } from './Params';
+import type { Estimate, GenerationRequest, ModelInfo } from '../../types';
 
-type Field = 'prompt' | 'text' | 'script' | 'avatar' | 'voice' | 'aspect' | 'duration' | 'quality' | 'n'
-  | 'style' | 'texture' | 'pbr' | 'engine';
-
-// Only the fields that apply to each kind.
-const FIELDS: Record<Kind, Field[]> = {
-  image: ['prompt', 'aspect', 'quality', 'n', 'style'],
-  svg: ['prompt', 'style'],
-  video: ['prompt', 'aspect', 'duration', 'quality'],
-  'model-3d': ['prompt', 'texture', 'pbr'],
-  audio: ['text', 'voice'],
-  sfx: ['prompt', 'duration'],
-  'avatar-video': ['script', 'avatar', 'voice'],
-  'bg-remove': [],
-  upscale: ['engine'],
+// Estudio sólo expone estos 5 tipos (spec F3.1.T1) — el resto del catálogo
+// (bg-remove, upscale, avatar-video, sfx) vive fuera de esta pantalla.
+type StudioKind = 'image' | 'video' | 'svg' | 'audio' | 'model-3d';
+const KINDS: StudioKind[] = ['image', 'video', 'svg', 'audio', 'model-3d'];
+const KIND_LABEL: Record<StudioKind, string> = { image: 'Imagen', video: 'Video', svg: 'SVG', audio: 'Voz', 'model-3d': '3D' };
+const CONTENT_LABEL: Record<StudioKind, string> = {
+  image: 'Prompt', video: 'Prompt', svg: 'Prompt', 'model-3d': 'Prompt', audio: 'Texto',
 };
-const NUMERIC: Field[] = ['duration', 'n'];
-const BOOLEAN: Field[] = ['texture', 'pbr'];
-const MULTILINE: Field[] = ['prompt', 'text', 'script'];
-const LABEL: Record<Field, string> = {
-  prompt: 'Prompt', text: 'Texto', script: 'Guion', avatar: 'Avatar', voice: 'Voz', aspect: 'Aspecto (1:1, 16:9…)',
-  duration: 'Duración (s)', quality: 'Calidad', n: 'Cantidad', style: 'Estilo', engine: 'Motor de upscale',
-  texture: 'Textura', pbr: 'PBR',
+
+const icon = (children: ReactNode) => (
+  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8}
+    strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    {children}
+  </svg>
+);
+const KIND_ICON: Record<StudioKind, ReactNode> = {
+  image: icon(<><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="m4 17 5-5 3.5 3.5L17 11l3 3" /></>),
+  video: icon(<><rect x="3" y="5" width="14" height="14" rx="2" /><path d="m21 8-4 3 4 3z" /></>),
+  svg: icon(<><path d="M5 20 15 4" /><circle cx="16" cy="3.2" r="1.6" fill="currentColor" stroke="none" /></>),
+  audio: icon(<><rect x="9" y="3" width="6" height="11" rx="3" /><path d="M6 11a6 6 0 0 0 12 0M12 17v4" /></>),
+  'model-3d': icon(<path d="M12 3 20 7.5v9L12 21 4 16.5v-9zM4 7.5 12 12l8-4.5M12 12v9" />),
 };
-const KINDS = Object.keys(FIELDS) as Kind[];
 
-type Values = Partial<Record<Field, string | boolean>>;
-
-function buildRequest(kind: Kind, model: string, v: Values, inputs: PickedInput[]): GenerationRequest {
-  const has = (f: Field) => FIELDS[kind].includes(f);
-  const str = (f: Field) => {
-    const x = has(f) && typeof v[f] === 'string' ? (v[f] as string).trim() : '';
-    return x || undefined;
-  };
-  const num = (f: Field) => {
-    const x = str(f);
-    return x !== undefined && Number.isFinite(Number(x)) ? Number(x) : undefined;
-  };
-  const req: GenerationRequest = { kind, model: model || undefined, prompt: str('prompt'), text: str('text'),
-    script: str('script'), avatar: str('avatar'), voice: str('voice') };
-  if (inputs.length) req.inputs = inputs.map((i) => (i.id ? { id: i.id } : { url: i.url! }));
-  const params = {
-    aspect: str('aspect'), duration: num('duration'), quality: str('quality'), n: num('n'),
-    style: str('style'), engine: str('engine'),
-    texture: has('texture') ? !!v.texture : undefined, pbr: has('pbr') ? !!v.pbr : undefined,
-  };
-  const clean = Object.fromEntries(Object.entries(params).filter(([, x]) => x !== undefined));
-  if (Object.keys(clean).length) req.params = clean;
-  return JSON.parse(JSON.stringify(req)); // drop undefined keys so estimate == CLI dry-run
-}
-
+const isStudioKind = (v: string | null): v is StudioKind => !!v && (KINDS as string[]).includes(v);
 const usd = (n: number) => `$${n.toFixed(3)}`;
 
-const INPUT_KINDS: Kind[] = ['bg-remove', 'upscale']; // always need an input, even before models load
+function buildRequest(kind: StudioKind, model: string, content: string, voice: string, params: ParamValues): GenerationRequest {
+  const req: GenerationRequest = { kind, model: model || undefined };
+  const trimmed = content.trim();
+  if (kind === 'audio') {
+    if (trimmed) req.text = trimmed;
+    if (voice.trim()) req.voice = voice.trim();
+  } else if (trimmed) {
+    req.prompt = trimmed;
+  }
+  const cleanParams = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== ''));
+  if (Object.keys(cleanParams).length) req.params = cleanParams;
+  return JSON.parse(JSON.stringify(req)); // drop undefined keys so estimate == what POST sends
+}
 
 export default function Studio() {
-  const [params] = useSearchParams();
-  // Query preload (?kind&model&input=…&prompt), read once on mount.
-  const [init] = useState(() => {
-    const k = params.get('kind') as Kind | null;
-    return { kind: k && KINDS.includes(k) ? k : 'image' as Kind, model: params.get('model') ?? '',
-      prompt: params.get('prompt'), inputs: params.getAll('input').filter(Boolean) };
-  });
+  const [search] = useSearchParams();
+  // Preload de /studio?kind&model&prompt (usado por "Derivar" en Asset) — leído una sola vez.
+  const [init] = useState(() => ({
+    kind: isStudioKind(search.get('kind')) ? (search.get('kind') as StudioKind) : 'image' as StudioKind,
+    model: search.get('model') ?? '',
+    content: search.get('prompt') ?? '',
+  }));
   const initModel = useRef(init.model);
-  const [kind, setKind] = useState<Kind>(init.kind);
+
+  const [kind, setKind] = useState<StudioKind>(init.kind);
   const [model, setModel] = useState('');
-  const [values, setValues] = useState<Values>(() => {
-    const f = FIELDS[init.kind].find((x) => MULTILINE.includes(x));
-    return init.prompt && f ? { [f]: init.prompt } : {};
-  });
-  const [inputs, setInputs] = useState<PickedInput[]>(() =>
-    init.inputs.map((x) => (/^https?:\/\//.test(x) ? { url: x } : { id: x })));
-  const [picking, setPicking] = useState(false);
+  const [content, setContent] = useState(init.content);
+  const [voice, setVoice] = useState('');
+  const [params, setParams] = useState<ParamValues>({});
   const [models, setModels] = useState<ModelInfo[]>([]);
+  const [totalAvailable, setTotalAvailable] = useState<number | null>(null);
   const [est, setEst] = useState<Estimate | null>(null);
   const [estError, setEstError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pending, setPending] = useState<Estimate | null>(null); // confirm dialog
+  const [pending, setPending] = useState<Estimate | null>(null);
   const [busy, setBusy] = useState(false);
-  const [submitted, setSubmitted] = useState<string[]>([]);
-  const jobs = useJobs();
+  const [lastJobId, setLastJobId] = useState<string | null>(null);
 
-  const request = useMemo(() => buildRequest(kind, model, values, inputs), [kind, model, values, inputs]);
-  const chosen = models.find((m) => m.id === model);
-  const maxInputs = chosen ? chosen.acceptsInputs
-    : models.some((m) => m.acceptsInputs === 'many') ? 'many' : models.some((m) => m.acceptsInputs === 1) ? 1 : 0;
-  const showInputs = maxInputs !== 0 || INPUT_KINDS.includes(kind);
-
-  // Preloaded ids have no mime yet: fetch it for the thumbnails.
-  useEffect(() => {
-    inputs.filter((i) => i.id && !i.mime).forEach((i) =>
-      getGeneration(i.id!).then((g) => setInputs((p) => p.map((x) => (x.id === i.id ? { ...x, mime: g.mime } : x)))).catch(() => {}));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const request = useMemo(() => buildRequest(kind, model, content, voice, params), [kind, model, content, voice, params]);
+  const provider = models.find((m) => m.id === model)?.provider;
 
   useEffect(() => {
-    setModel(initModel.current);
-    initModel.current = '';
-    setModels([]);
-    listModels(kind).then((r) => setModels(r.items)).catch(() => {});
+    listModels().then((r) => setTotalAvailable(r.items.filter((m) => m.available).length)).catch(() => {});
+  }, []);
+
+  // Tipo cambiado → catálogo y parámetros vuelven a cero; el modelo por
+  // defecto es el primero disponible (FR-11), salvo un preload por query string.
+  useEffect(() => {
+    let live = true;
+    setParams({});
+    listModels(kind).then((r) => {
+      if (!live) return;
+      setModels(r.items);
+      const available = r.items.filter((m) => m.available);
+      const preload = initModel.current;
+      initModel.current = '';
+      setModel(preload && available.some((m) => m.id === preload) ? preload : available[0]?.id ?? '');
+    }).catch(() => live && setModels([]));
+    return () => { live = false; };
   }, [kind]);
 
-  // Live estimate, debounced 400 ms.
+  // Estimación en vivo, debounced 400ms — mismo contrato que POST /api/generations envía.
   useEffect(() => {
     let stale = false;
     const t = setTimeout(() => {
@@ -116,18 +103,15 @@ export default function Studio() {
     return () => { stale = true; clearTimeout(t); };
   }, [request]);
 
-  const set = (f: Field, v: string | boolean) => setValues((p) => ({ ...p, [f]: v }));
-
   async function send(confirm?: boolean) {
     setBusy(true);
     setError(null);
     setPending(null);
     try {
       const { job } = await createGeneration(confirm ? { ...request, confirm: true } : request);
-      upsertJob(job);
-      setSubmitted((p) => [job.id, ...p]);
-      setValues({}); // ready for another generation
-      setInputs([]);
+      setLastJobId(job.id);
+      setContent('');
+      setVoice('');
     } catch (e) {
       if (e instanceof ApiError && e.code === 'cost_confirm_required') setPending(e.details as Estimate);
       else if (e instanceof ApiError && e.code === 'budget_exceeded') {
@@ -139,107 +123,133 @@ export default function Studio() {
     }
   }
 
-  const finished = submitted
-    .map((id) => jobs.find((j) => j.id === id))
-    .filter((j) => j && (j.status === 'done' || j.status === 'failed'));
+  const generateLabel = busy ? 'Generando…'
+    : est && est.known && est.level !== 'auto' ? `Generar · confirmar ${usd(est.costUsd)}`
+    : 'Generar';
 
   return (
-    <div>
-      <h1>Studio</h1>
-      <form onSubmit={(e) => { e.preventDefault(); void send(); }}>
-        <label>Tipo{' '}
-          <select value={kind} onChange={(e) => setKind(e.target.value as Kind)}>
-            {KINDS.map((k) => <option key={k} value={k}>{k}</option>)}
-          </select>
-        </label>
-        {FIELDS[kind].map((f) => (
-          <div key={f}>
-            <label>
-              {BOOLEAN.includes(f) ? (
-                <input type="checkbox" checked={!!values[f]} onChange={(e) => set(f, e.target.checked)} />
-              ) : null}
-              {LABEL[f]}{' '}
-              {MULTILINE.includes(f) ? (
-                <textarea rows={3} value={(values[f] as string) ?? ''} onChange={(e) => set(f, e.target.value)} />
-              ) : BOOLEAN.includes(f) ? null : (
-                <input type={NUMERIC.includes(f) ? 'number' : 'text'} min={NUMERIC.includes(f) ? 1 : undefined}
-                  value={(values[f] as string) ?? ''} onChange={(e) => set(f, e.target.value)} />
-              )}
-            </label>
-          </div>
-        ))}
-        {showInputs && (
-          <div>
-            Inputs{' '}
-            {inputs.map((i, n) => (
-              <span key={i.id ?? i.url}>
-                <Thumb input={i} />
-                <button type="button" aria-label="Quitar" onClick={() => setInputs((p) => p.filter((_, m) => m !== n))}>×</button>
-              </span>
-            ))}{' '}
-            <button type="button" onClick={() => setPicking(true)}>Elegir de la biblioteca…</button>
-          </div>
-        )}
-        <div>
-          <label>Modelo{' '}
-            <select value={model} onChange={(e) => setModel(e.target.value)}>
-              <option value="">Auto</option>
-              {models.map((m) => (
-                <option key={m.id} value={m.id} disabled={!m.available}>
-                  {m.id}{m.unitCostUsd != null ? ` (${usd(m.unitCostUsd)})` : ''}{m.available ? '' : ' — sin key'}
-                </option>
+    <div style={page}>
+      <header style={header}>
+        <h1 style={title}>Estudio</h1>
+        <p style={subtitle}>Control manual del router{totalAvailable != null ? ` · ${totalAvailable} modelos disponibles` : ''}</p>
+      </header>
+
+      <div style={body}>
+        <form style={formCol} onSubmit={(e) => { e.preventDefault(); void send(); }}>
+          <section>
+            <div style={sectionLabel}>Tipo de asset</div>
+            <div style={tabs} role="radiogroup" aria-label="Tipo de asset">
+              {KINDS.map((k) => (
+                <button key={k} type="button" onClick={() => setKind(k)} aria-pressed={k === kind} style={tab(k === kind)}>
+                  {KIND_ICON[k]}{KIND_LABEL[k]}
+                </button>
               ))}
-            </select>
-          </label>
-          {models.some((m) => !m.available) && (
-            <small> Modelos «sin key»: <Link to="/providers">configurar proveedores</Link></small>
-          )}
+            </div>
+          </section>
+
+          <section>
+            <label style={sectionLabel} htmlFor="studio-content">{CONTENT_LABEL[kind]}</label>
+            <textarea id="studio-content" style={textarea} rows={4} value={content}
+              onChange={(e) => setContent(e.target.value)} />
+            {kind === 'audio' && (
+              <input type="text" style={{ ...textInput, marginTop: 8 }} placeholder="Voz (id) — opcional"
+                value={voice} onChange={(e) => setVoice(e.target.value)} />
+            )}
+          </section>
+
+          <ModelPicker models={models} value={model} onChange={setModel} />
+          <Params kind={kind} provider={provider} values={params} onChange={setParams} />
+
+          <section style={estimateBox}>
+            {est ? (
+              <p style={estimateText}>
+                Estimado <strong style={estimateAmount}>{est.known ? usd(est.costUsd) : 'desconocido'}</strong>
+                {' '}· modelo {est.model}
+                {est.candidates.length > 1 && ` · fallback: ${est.candidates.filter((c) => c !== est.model).join(', ')}`}
+                {est.budgetLeftUsd != null && ` · quedan ${usd(est.budgetLeftUsd)} de tope hoy`}
+              </p>
+            ) : estError ? <p style={estimateText}>Sin estimación: {estError}</p> : <p style={estimateText}>Estimando…</p>}
+          </section>
+
+          {error && <p role="alert" style={errorText}>{error}</p>}
+
+          <button type="submit" style={generateBtn} disabled={busy}>{generateLabel}</button>
+        </form>
+
+        <div style={canvasCol}>
+          <p style={canvasNote}>
+            {lastJobId ? <>Job <code style={jobCode}>{lastJobId}</code> en cola.</> : 'Generá algo para verlo acá.'}
+            {' '}El lienzo de resultado y la cola llegan en F3.1.T2.
+          </p>
         </div>
-
-        <p aria-live="polite">
-          {est ? (
-            <>
-              Costo estimado: <strong>{est.known ? usd(est.costUsd) : 'desconocido'}</strong> · nivel {est.level} · modelo {est.model}
-              {est.candidates.length > 1 && <> · fallback: {est.candidates.filter((c) => c !== est.model).join(', ')}</>}
-            </>
-          ) : estError ? `Sin estimación: ${estError}` : 'Estimando…'}
-        </p>
-        {error && <p role="alert">{error}</p>}
-        <button type="submit" disabled={busy}>Generar</button>
-      </form>
-
-      {picking && (
-        <AssetPicker multiple={maxInputs === 'many'} onClose={() => setPicking(false)}
-          onPick={(items) => { setInputs((p) => (maxInputs === 'many' ? [...p, ...items] : items)); setPicking(false); }} />
-      )}
+      </div>
 
       {pending && (
-        <dialog open role="alertdialog">
+        <dialog open role="alertdialog" style={dialog}>
           <p>Costo alto: {usd(pending.costUsd)} con {pending.model}. ¿Continuar?</p>
-          <button onClick={() => void send(true)}>Confirmar</button>{' '}
-          <button onClick={() => setPending(null)}>Cancelar</button>
+          <div style={dialogActions}>
+            <button type="button" style={generateBtn} onClick={() => void send(true)}>Confirmar</button>
+            <button type="button" style={secondaryBtn} onClick={() => setPending(null)}>Cancelar</button>
+          </div>
         </dialog>
       )}
-
-      {finished.map((j) => j && <Result key={j.id} ids={j.generationIds} error={j.error?.message} />)}
     </div>
   );
 }
 
-function Result({ ids, error }: { ids: string[]; error?: string }) {
-  const [gens, setGens] = useState<Generation[]>([]);
-  useEffect(() => { Promise.all(ids.map(getGeneration)).then(setGens).catch(() => {}); }, [ids]);
-  if (error) return <p role="alert">Falló: {error}</p>;
-  return (
-    <section>
-      {gens.map((g) => (
-        <figure key={g.id}>
-          {g.mime.startsWith('image/') ? <img src={fileUrl(g.id)} alt={g.prompt ?? g.kind} style={{ maxWidth: 320 }} />
-            : g.mime.startsWith('video/') ? <video src={fileUrl(g.id)} controls style={{ maxWidth: 320 }} />
-            : g.mime.startsWith('audio/') ? <audio src={fileUrl(g.id)} controls /> : null}
-          <figcaption><Link to={`/asset/${g.id}`}>Ver detalle</Link> · {usd(g.costUsd)}</figcaption>
-        </figure>
-      ))}
-    </section>
-  );
-}
+const page: CSSProperties = { display: 'flex', flexDirection: 'column', height: '100%' };
+const header: CSSProperties = { padding: '20px 28px 16px', borderBottom: '1px solid var(--border-soft)' };
+const title: CSSProperties = { fontFamily: 'var(--font-display)', fontSize: 24, color: 'var(--text-primary)', margin: 0 };
+const subtitle: CSSProperties = { fontSize: 12.5, color: 'var(--text-muted)', margin: '4px 0 0', fontFamily: 'var(--font-mono)' };
+
+const body: CSSProperties = { display: 'flex', flex: 1, minHeight: 0 };
+const formCol: CSSProperties = {
+  width: 380, minWidth: 380, overflowY: 'auto', padding: 20,
+  display: 'flex', flexDirection: 'column', gap: 18,
+  background: 'var(--bg-surface)', borderRight: '1px solid var(--border)',
+};
+const canvasCol: CSSProperties = {
+  flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
+};
+const canvasNote: CSSProperties = { color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', maxWidth: 360 };
+const jobCode: CSSProperties = { fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' };
+
+const sectionLabel: CSSProperties = {
+  display: 'block', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase',
+  color: 'var(--text-muted)', marginBottom: 8, fontFamily: 'var(--font-ui)',
+};
+const tabs: CSSProperties = { display: 'flex', gap: 6, flexWrap: 'wrap' };
+const tab = (active: boolean): CSSProperties => ({
+  display: 'flex', alignItems: 'center', gap: 6, padding: '7px 11px', borderRadius: 8,
+  border: `1px solid ${active ? 'var(--accent)' : 'var(--border)'}`,
+  background: active ? 'var(--accent-soft)' : 'var(--bg-input)',
+  color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
+  fontSize: 12.5, fontFamily: 'var(--font-ui)', fontWeight: active ? 600 : 500, cursor: 'pointer',
+});
+
+const textInput: CSSProperties = {
+  width: '100%', background: 'var(--bg-input)', border: '1px solid var(--border)', borderRadius: 8,
+  padding: '9px 10px', color: 'var(--text-primary)', fontFamily: 'var(--font-ui)', fontSize: 13.5, boxSizing: 'border-box',
+};
+const textarea: CSSProperties = { ...textInput, resize: 'vertical', fontFamily: 'var(--font-ui)', lineHeight: 1.4 };
+
+const estimateBox: CSSProperties = {
+  background: 'var(--bg-elevated)', border: '1px solid var(--border-soft)', borderRadius: 10, padding: '10px 12px',
+};
+const estimateText: CSSProperties = { margin: 0, fontSize: 12.5, color: 'var(--text-secondary)' };
+const estimateAmount: CSSProperties = { color: 'var(--warn)', fontFamily: 'var(--font-mono)' };
+const errorText: CSSProperties = { color: 'var(--danger)', fontSize: 13, margin: 0 };
+
+const generateBtn: CSSProperties = {
+  background: 'var(--accent)', color: 'var(--bone)', border: 'none', borderRadius: 10,
+  padding: '11px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-ui)',
+};
+const secondaryBtn: CSSProperties = {
+  background: 'transparent', color: 'var(--text-secondary)', border: '1px solid var(--border)', borderRadius: 10,
+  padding: '11px 16px', fontSize: 14, cursor: 'pointer', fontFamily: 'var(--font-ui)',
+};
+const dialog: CSSProperties = {
+  background: 'var(--bg-elevated)', color: 'var(--text-primary)', border: '1px solid var(--border)',
+  borderRadius: 12, padding: 20,
+};
+const dialogActions: CSSProperties = { display: 'flex', gap: 8, marginTop: 12 };
