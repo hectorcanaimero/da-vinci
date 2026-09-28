@@ -40,6 +40,11 @@ Done when: `cargo tauri build` toma los íconos sin advertencias, la app muestra
 el suyo en el Dock, la barra de tareas y el lanzador de cada sistema, y a 16 px
 la forma sigue siendo reconocible.
 
+
+**Referencia visual:** `docs/design/board-identidad.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
+
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 2.5h
 - **Reason**: Producción de assets con una decisión de diseño pendiente que hay que resolver para dos plataformas.

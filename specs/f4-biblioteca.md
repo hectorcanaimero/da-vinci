@@ -36,6 +36,11 @@ Done when: buscar un fragmento de prompt deja sólo los assets que lo contienen,
 cada filtro acota como corresponde, y alternar entre grilla y lista conserva la
 búsqueda y los filtros activos.
 
+
+**Referencia visual:** `docs/design/galeria.png · galeria-lista.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
+
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 4h
 - **Reason**: Reestilado más funciones nuevas sobre una página existente que ya resuelve los datos.
@@ -61,6 +66,11 @@ Done when: sin assets aparece el estado vacío con su acción; con 5.000 registr
 sembrados, desplazarse por la galería no traba la interfaz y la memoria no crece
 sin techo.
 
+
+**Referencia visual:** `docs/design/galeria-vacia.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
+
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 3h
 - **Reason**: La virtualización tiene que medirse contra un caso real, no asumirse.
@@ -83,6 +93,11 @@ SVG, audio y 3D con `@google/model-viewer`. Se reestilan, no se reescriben.
 Done when: cada tipo de asset abre en su visor correspondiente, el panel muestra
 prompt, modelo, proveedor, costo, parámetros y ruta en disco, y las flechas
 navegan al asset anterior y siguiente sin volver a la galería.
+
+
+**Referencia visual:** `docs/design/detalle-asset.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
 
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 4h
@@ -110,6 +125,11 @@ Done when: un asset derivado muestra su origen y el origen muestra sus
 derivados, ambos navegables; y usar como referencia lleva al Estudio con el
 asset ya adjunto.
 
+
+**Referencia visual:** `docs/design/detalle-asset.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
+
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 3h
 - **Reason**: La relación ya está en la base; el trabajo es de presentación y de encadenar dos pantallas.
@@ -136,6 +156,11 @@ destrucción de toda la biblioteca exige confirmación escrita, no un botón.
 Done when: la acción abre el explorador con el archivo seleccionado en los tres
 sistemas; borrar un asset pide confirmación nombrando lo que elimina; y la
 acción destructiva de Ajustes no se dispara sin texto confirmado.
+
+
+**Referencia visual:** `docs/design/galeria-borrar.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
 
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 3h

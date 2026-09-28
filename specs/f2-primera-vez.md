@@ -156,6 +156,11 @@ Done when: pegar una llave válida deja el proveedor en conectado y sus modelos
 disponibles en el router; una llave inválida lo deja en error con el mensaje del
 proveedor; y en ningún momento se muestra una llave completa.
 
+
+**Referencia visual:** `docs/design/ajustes-proveedores.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
+
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 3.5h
 - **Reason**: Componente reusado por dos pantallas, con estados de error que tienen que ser claros.
@@ -185,6 +190,11 @@ instalación previa.
 
 Done when: partiendo de cero, conectando sólo una llave, el asistente se
 completa y deja un asset generado visible en la galería.
+
+
+**Referencia visual:** `docs/design/onboarding.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
 
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 4h

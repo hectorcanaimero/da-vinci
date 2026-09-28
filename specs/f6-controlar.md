@@ -112,6 +112,11 @@ Done when: cerrando la app con trabajos en cola y reabriendo, el banner aparece
 con el conteo correcto; reanudar los vuelve a ejecutar en vivo; y un trabajo
 fallido muestra el mensaje del proveedor.
 
+
+**Referencia visual:** `docs/design/actividad.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
+
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 4h
 - **Reason**: Pantalla con estado en vivo sobre una API ya completa.
@@ -158,6 +163,11 @@ una serie temporal y un par de barras.
 Done when: el total de los indicadores coincide con la suma de la tabla,
 cambiar el período recalcula todo, y exportar descarga el CSV de F6.3.T1.
 
+
+**Referencia visual:** `docs/design/gastos.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
+
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 4h
 - **Reason**: Presentación de datos con un gráfico propio; la consistencia de los totales es lo que hay que verificar.
@@ -191,6 +201,11 @@ permisos y directorio de trabajo, que tiene que ser visible y modificable
 Done when: las siete secciones son navegables, cambiar la carpeta de assets hace
 que las generaciones nuevas aterricen ahí, y el directorio de trabajo del agente
 se ve y se cambia.
+
+
+**Referencia visual:** `docs/design/ajustes-proveedores.png · ajustes-agentes.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
 
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 4h
@@ -227,6 +242,11 @@ F4.3.T1.
 Done when: exponer en la red exige confirmación y deja el servidor accesible con
 la llave; apagar el endpoint compatible hace que `/v1` deje de responder; y
 cambiar el tema del sistema con la app abierta la hace acompañar.
+
+
+**Referencia visual:** `docs/design/ajustes-servidor.png · ajustes-presupuesto.png · ajustes-apariencia.png · ajustes-avanzado.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
 
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 4h

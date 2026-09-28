@@ -38,6 +38,11 @@ Done when: cambiar el tipo de asset cambia la lista de modelos sugeridos;
 sin llave de un proveedor, ninguno de sus modelos aparece; y generar dispara
 `POST /api/generations` con el modelo y los parámetros que la pantalla muestra.
 
+
+**Referencia visual:** `docs/design/estudio.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
+
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 4h
 - **Reason**: Pantalla central del producto, con estado que depende del catálogo y del tipo elegido.
@@ -60,6 +65,11 @@ su lugar hecho. La tira de trabajos se alimenta del flujo de eventos que
 
 Done when: generar muestra el resultado en el lienzo sin recargar, y los
 cambios de estado del trabajo aparecen en la tira en vivo.
+
+
+**Referencia visual:** `docs/design/estudio.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
 
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 3h
@@ -113,6 +123,11 @@ Done when: una generación por debajo del umbral se ejecuta sin interrupción,
 una por encima abre la confirmación con el costo real, y alcanzado el tope el
 botón de generar queda deshabilitado con el motivo visible.
 
+
+**Referencia visual:** `docs/design/estudio.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
+
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 3h
 - **Reason**: Componente compartido, simple, pero es lo que el usuario mira antes de cada gasto.
@@ -138,6 +153,11 @@ El selector de archivos del sistema usa el plugin de diálogos de Tauri, no un
 Done when: las tres formas de adjuntar dejan la referencia en la lista, quitarla
 la saca, y la generación viaja al proveedor con las referencias adjuntas para
 los modelos que las soportan.
+
+
+**Referencia visual:** `docs/design/estudio.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
 
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 3.5h

@@ -88,6 +88,11 @@ Done when: escribir un mensaje muestra la respuesta del agente apareciendo de a
 poco; adjuntar un asset de la biblioteca lo manda como referencia; y un asset
 generado desde el chat aparece en la galería con su prompt y su costo (FR-35).
 
+
+**Referencia visual:** `docs/design/chat.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
+
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 4h
 - **Reason**: La pantalla más densa del diseño, sobre un puente que ya está resuelto.
@@ -113,6 +118,11 @@ funcionando normalmente**. No es un error ni un bloqueo: es un estado.
 Done when: el costo de la sesión acumula a medida que se generan assets; una
 generación cara pide confirmación también desde el chat; y con el agente
 desinstalado, la pantalla muestra la guía y las otras cinco pantallas funcionan.
+
+
+**Referencia visual:** `docs/design/chat.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
 
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 3h
@@ -143,6 +153,11 @@ globales.
 
 Done when: escribir el nombre de un modelo lo muestra con su costo; elegir un
 destino navega; en Windows y Linux los atajos se dibujan con `Ctrl`.
+
+
+**Referencia visual:** `docs/design/command-palette.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
 
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 4h

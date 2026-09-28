@@ -246,6 +246,11 @@ Done when: la app abre en los tres sistemas con los controles en el lado que
 corresponde, arrastrar la barra mueve la ventana, y `platform_info()` devuelve
 el modificador correcto.
 
+
+**Referencia visual:** `docs/design/componente-sidebar.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
+
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 3.5h
 - **Reason**: Diferencias reales entre sistemas operativos que hay que probar en los tres.
@@ -275,6 +280,11 @@ dependencias nuevas.
 Done when: las seis pantallas son alcanzables, el pie del panel muestra estado
 real del servidor y gasto real, y a 1024 px de ancho no hay barrido horizontal
 (FR-4).
+
+
+**Referencia visual:** `docs/design/componente-sidebar.png` — comparar contra la
+imagen antes de dar la tarea por terminada. Colores y tipografias salen de
+`ui/src/styles/tokens.css` por nombre, nunca leidos de la captura.
 
 - **Model**: claude/claude-sonnet-5
 - **Estimate**: 4h
