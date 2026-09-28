@@ -1,0 +1,73 @@
+@font-face {
+  font-family: 'Fraunces';
+  src: url('/fonts/fraunces-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-500.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Inter';
+  src: url('/fonts/inter-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono-400.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/jetbrains-mono-600.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root[data-theme='dark'] {
+  --bg-app: #12110e;
+  --bg-surface: #1a1815;
+  --bg-elevated: #232019;
+  --bg-input: #0e0d0b;
+
+  --border: #302b23;
+  --border-soft: #221f1a;
+
+  --text-primary: #f3eee2;
+  --text-secondary: #a49d8f;
+  --text-muted: #6b6559;
+
+  --accent: #c0693a;
+  --accent-soft: #3a2318;
+  --bone: #e6dbc2;
+
+  --ok: #7e9e6a;
+  --warn: #d2a44b;
+  --danger: #c0553f;
+
+  --font-display: 'Fraunces', serif;
+  --font-ui: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
