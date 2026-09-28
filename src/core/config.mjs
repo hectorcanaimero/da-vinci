@@ -7,6 +7,8 @@ export const DEFAULTS = {
   host: '127.0.0.1',
   apiKey: null,
   concurrency: 3,
+  // FR-29: intentos totales por trabajo (1 corrida + reintentos) antes de rendirse.
+  maxAttempts: 4,
   // FR-32: tope de gasto del día, en USD. null = sin tope.
   dailyBudgetUsd: null,
   // Umbrales de costo de una generación, en USD (FR-17): por encima de `warn`
