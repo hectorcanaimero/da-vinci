@@ -131,12 +131,12 @@ fn agent_send(
     refs: Vec<String>,
     on_event: Channel<AgentEvent>,
 ) -> Result<(), String> {
-    Err(NOT_IMPLEMENTED.into())
+    agent::send(prompt, refs, on_event)
 }
 
 #[tauri::command]
 fn agent_cancel() -> Result<(), String> {
-    Err(NOT_IMPLEMENTED.into())
+    agent::cancel()
 }
 
 #[tauri::command]
