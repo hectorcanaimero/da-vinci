@@ -17,6 +17,10 @@ pub struct ServerStatus {
     pub pid: Option<u32>,
     pub uptime_ms: u64,
     pub alive: bool,
+    pub url: Option<String>,
+    /// NFR-13: si el servidor no arrancó, la interfaz muestra por qué en vez
+    /// de quedarse en blanco.
+    pub error: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -53,8 +57,30 @@ pub enum AgentEvent {
 }
 
 #[tauri::command]
-fn server_status() -> Result<ServerStatus, String> {
-    Err(NOT_IMPLEMENTED.into())
+fn server_status(app: tauri::AppHandle) -> Result<ServerStatus, String> {
+    use tauri::Manager;
+    let state = app
+        .try_state::<sidecar::SidecarState>()
+        .ok_or("el plugin del sidecar no está montado")?;
+    let process = state.process.lock().unwrap();
+    Ok(match process.as_ref() {
+        Some(s) => ServerStatus {
+            alive: true,
+            port: Some(s.port),
+            pid: Some(s.pid),
+            uptime_ms: s.started.elapsed().as_millis() as u64,
+            url: Some(s.url()),
+            error: None,
+        },
+        None => ServerStatus {
+            alive: false,
+            port: None,
+            pid: None,
+            uptime_ms: 0,
+            url: None,
+            error: state.last_error.lock().unwrap().clone(),
+        },
+    })
 }
 
 #[tauri::command]
@@ -69,17 +95,17 @@ fn server_stop() -> Result<(), String> {
 
 #[tauri::command]
 fn secrets_list() -> Result<Vec<KeyStatus>, String> {
-    Err(NOT_IMPLEMENTED.into())
+    Ok(secrets::list())
 }
 
 #[tauri::command]
 fn secrets_set(provider: String, value: String) -> Result<KeyStatus, String> {
-    Err(NOT_IMPLEMENTED.into())
+    secrets::set(&provider, &value)
 }
 
 #[tauri::command]
 fn secrets_delete(provider: String) -> Result<(), String> {
-    Err(NOT_IMPLEMENTED.into())
+    secrets::delete(&provider)
 }
 
 #[tauri::command]
@@ -124,6 +150,8 @@ fn pick_files() -> Result<Option<Vec<String>>, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Arranca el servidor Node y garantiza que muera con la app (D10).
+        .plugin(sidecar::plugin())
         .setup(|app| {
             // D9: macOS keeps native decorations (titleBarStyle: Overlay in
             // tauri.conf.json draws the traffic lights over our bar); Windows

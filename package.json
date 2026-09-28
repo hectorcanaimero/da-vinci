@@ -17,7 +17,13 @@
     "install:setup": "node install.mjs",
     "lint": "node --check src/generate.mjs && node --check src/utils/*.mjs && node --check src/providers/*.mjs && node --check src/core/*.mjs && node --check src/library/*.mjs",
     "test": "node --test test/*.test.mjs",
-    "test:secrets": "node -e \"import('./src/utils/secrets.mjs').then(m => m.loadSecrets().then(s => console.log('OK. Source:', s.source, 'Keys:', Object.keys(s.secrets))))\""
+    "test:secrets": "node -e \"import('./src/utils/secrets.mjs').then(m => m.loadSecrets().then(s => console.log('OK. Source:', s.source, 'Keys:', Object.keys(s.secrets))))\"",
+    "tauri": "tauri",
+    "app:dev": "tauri dev",
+    "app:build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.12.0"
   },
   "files": [
     "src/",
