@@ -3,7 +3,7 @@ import { DavinciError } from '../../core/errors.mjs';
 import { MODELS, COST_TABLE } from '../../core/catalog.mjs';
 import { importManifest } from '../../library/import.mjs';
 import { detectDavinci, migrateFromDavinci } from '../../library/migrate.mjs';
-import { resolveHome } from '../../core/config.mjs';
+import { loadConfig, resolveHome } from '../../core/config.mjs';
 
 const { version } = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'));
 
@@ -18,6 +18,19 @@ const found = (v, what) => {
   return v;
 };
 
+/**
+ * Barrera de gasto (FR-17, FR-32): estima sin llamar a ningún proveedor y
+ * decide qué pasaría. El tope diario va primero — `confirm` no lo saltea.
+ */
+function gate(request, { router, library }) {
+  const est = router.estimate(request, { library }); // 400 si es inválido
+  const dailyBudgetUsd = loadConfig().dailyBudgetUsd;
+  const left = est.budgetLeftUsd;
+  const blocked = left != null && (left <= 0 || est.costUsd > left);
+  return { ...est, dailyBudgetUsd, spentTodayUsd: library.spentToday(), blocked,
+    needsConfirm: !blocked && est.level === 'confirm' };
+}
+
 export const routes = [
   { method: 'GET', path: '/api/health', handler: (req, res, { send }) => send(200, { ok: true, version }) },
 
@@ -28,16 +41,17 @@ export const routes = [
     })),
   }) },
 
+  // Modo de sólo estimar (FR-18): ni proveedor, ni gasto, ni asset.
   { method: 'POST', path: '/api/estimate', handler: (req, res, { send, body, router, library }) =>
-    send(200, router.estimate(body ?? {}, { library })) },
+    send(200, gate(body ?? {}, { router, library })) },
 
   { method: 'POST', path: '/api/generations', handler(req, res, { send, body, router, library, jobs }) {
     const request = body ?? {};
-    const est = router.estimate(request, { library }); // 400 si es inválido
-    if (est.budgetLeftUsd != null && est.costUsd > est.budgetLeftUsd) {
-      throw new DavinciError('budget_exceeded', 'Tope diario superado', est);
+    const est = gate(request, { router, library });
+    if (est.blocked) {
+      throw new DavinciError('budget_exceeded', `Tope diario de $${est.dailyBudgetUsd} alcanzado`, est);
     }
-    if (est.level === 'confirm' && !request.confirm) {
+    if (est.needsConfirm && !request.confirm) {
       throw new DavinciError('cost_confirm_required', `Costo alto ($${est.costUsd.toFixed(3)}): requiere confirmación`, est);
     }
     const source = req.headers['x-davinci-source'] === 'dashboard' ? 'dashboard' : 'api';
