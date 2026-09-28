@@ -15,7 +15,21 @@
       "mcp__orch__orch_get_task",
       "mcp__orch__orch_context",
       "mcp__orch__orch_events",
-      "mcp__orch__orch_list_tasks"
+      "mcp__orch__orch_list_tasks",
+      "mcp__orch__orch_set_status",
+"mcp__orch__orch_report_finding",
+"Bash(scripts/task-finish.sh:*)",
+"Bash(scripts/task-start.sh:*)",
+"Bash(scripts/task-block.sh:*)",
+"Bash(eza:*)",
+"Bash(bat:*)",
+"Bash(rg:*)",
+"Bash(fd:*)",
+"Bash(sd:*)",
+"Bash(cargo:*)",
+"Bash(rustup:*)",
+"Bash(git add:*)",
+"Bash(git commit:*)"
     ]
   }
 }

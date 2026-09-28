@@ -30,19 +30,30 @@ nombrada con su variable (`OPENAI_API_KEY`, `GEMINI_API_KEY`, `FAL_API_KEY`,
 `KIE_API_KEY`, `HEYGEN_API_KEY`, `ELEVENLABS_API_KEY`, `TRIPO_API_KEY`).
 
 Cuando el llavero no está disponible —típicamente un Linux sin servicio de
-secretos— caer a `~/.config/reveron/.env` creado con permisos `600`. Esa ruta
-ya la sabe leer `src/utils/secrets.mjs`, así que el respaldo no requiere tocar
-el lado de Node. El origen efectivo de cada llave es parte de lo que se
-reporta (FR-9).
+secretos— caer a `~/.config/reveron/.env` creado con permisos `600`. El origen
+efectivo de cada llave es parte de lo que se reporta (FR-9).
+
+**Ojo con el lado de Node.** `src/utils/dotenv.mjs` hoy **no** busca esa ruta:
+su `SEARCH_PATHS` (líneas 16-21) apunta a `~/.config/da-vinci/.env` y
+`~/.claude/skills/da-vinci/.env`. Si Rust escribe el respaldo en `reveron` y
+nadie toca `dotenv.mjs`, el archivo queda escrito y el servidor no lo lee
+nunca. Esta tarea agrega `~/.config/reveron/.env` a `SEARCH_PATHS` **antes**
+de las dos rutas de `da-vinci`, que quedan como compatibilidad hacia atrás
+hasta el rebrand de F7.3.T2.
 
 Completar los comandos `secrets_list`, `secrets_set` y `secrets_delete` que
 `lib.rs` ya tiene registrados. `secrets_list` devuelve por proveedor: si hay
 llave, los últimos cuatro caracteres, y de dónde salió. **Nunca devolver la
 llave completa al frontend.**
 
-Done when: guardar, listar y borrar funciona en el llavero nativo; forzando la
-ausencia de llavero, lo mismo funciona contra el archivo con permisos `600`; y
-ningún comando expone una llave entera.
+Compilá y corré los tests antes de dar la tarea por hecha: `cargo test` dentro
+de `src-tauri/`. Si `cargo` no está en el `PATH`, **no declares la tarea
+terminada**: reportá el bloqueo en vez de entregar código sin compilar.
+
+Done when: `cargo test` pasa; guardar, listar y borrar funciona en el llavero
+nativo; forzando la ausencia de llavero, lo mismo funciona contra el archivo
+con permisos `600`; `searchPaths()` de Node incluye la ruta `reveron`; y ningún
+comando expone una llave entera.
 
 - **Model**: claude/opus
 - **Estimate**: 4h
@@ -50,6 +61,8 @@ ningún comando expone una llave entera.
 - **Dependencies**: F1.1.T1
 - **Files**:
   - `src-tauri/src/secrets.rs`
+  - `src-tauri/Cargo.toml`
+  - `src/utils/dotenv.mjs`
 
 ### F2.1.T2 — Inyección de llaves al servidor y rotación en caliente
 
