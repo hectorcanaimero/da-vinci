@@ -1,0 +1,101 @@
+# Produce los cuatro instaladores de Reverón: .dmg (arm64 + x64), .msi, .AppImage.
+#
+# Distribución de Linux de referencia para v1: Ubuntu 24.04 LTS (webkit2gtk-4.1).
+# Otras distribuciones pueden requerir paquetes de WebKitGTK distintos.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            target: aarch64-apple-darwin
+            bundle: dmg
+            ext: dmg
+          - os: macos-14
+            target: x86_64-apple-darwin
+            bundle: dmg
+            ext: dmg
+          - os: windows-2022
+            target: x86_64-pc-windows-msvc
+            bundle: msi
+            ext: msi
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            bundle: appimage
+            ext: AppImage
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22.13"
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install UI dependencies
+        run: npm --prefix ui ci
+
+      - name: Fetch Node sidecar binary
+        run: node scripts/fetch-node.mjs --target ${{ matrix.target }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Tauri system deps (Linux — Ubuntu 24.04 reference)
+        if: matrix.os == 'ubuntu-24.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev \
+            libxdo-dev libssl-dev patchelf file
+
+      - name: Build installer
+        run: npm run app:build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundle }}
+
+      - name: Verify installer size (NFR-12 — falla si supera 150 MB)
+        shell: bash
+        env:
+          INSTALLER_DIR: src-tauri/target/${{ matrix.target }}/release/bundle/${{ matrix.bundle }}
+          INSTALLER_EXT: ${{ matrix.ext }}
+        run: |
+          node --input-type=module -e '
+          import { readdirSync, statSync } from "node:fs";
+          import { join } from "node:path";
+
+          const LIMIT = 150 * 1024 * 1024;
+          const dir = process.env.INSTALLER_DIR;
+          const ext = "." + process.env.INSTALLER_EXT;
+          const files = readdirSync(dir).filter((f) => f.endsWith(ext));
+
+          if (files.length === 0) throw new Error(`No se encontró ningún ${ext} en ${dir}`);
+
+          for (const file of files) {
+            const size = statSync(join(dir, file)).size;
+            const mb = (size / 1024 / 1024).toFixed(1);
+            console.log(`${file}: ${mb} MB`);
+            if (size > LIMIT) {
+              throw new Error(`${file} pesa ${mb} MB, supera el límite de 150 MB del NFR-12`);
+            }
+          }
+          '
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reveron-${{ matrix.target }}
+          path: src-tauri/target/${{ matrix.target }}/release/bundle/${{ matrix.bundle }}/*.${{ matrix.ext }}
+          if-no-files-found: error
