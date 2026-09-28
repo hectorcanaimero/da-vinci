@@ -34,12 +34,6 @@ pub struct AgentInfo {
 }
 
 #[derive(Serialize)]
-pub struct PlatformInfo {
-    pub os: String,
-    pub modifier_key: String,
-}
-
-#[derive(Serialize)]
 #[serde(tag = "event", content = "data")]
 pub enum AgentEvent {
     Chunk { text: String },
@@ -99,8 +93,8 @@ fn agent_cancel() -> Result<(), String> {
 }
 
 #[tauri::command]
-fn platform_info() -> Result<PlatformInfo, String> {
-    Err(NOT_IMPLEMENTED.into())
+fn platform_info() -> Result<platform::PlatformInfo, String> {
+    Ok(platform::platform_info())
 }
 
 #[tauri::command]
@@ -121,6 +115,19 @@ fn pick_files() -> Result<Option<Vec<String>>, String> {
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        .setup(|app| {
+            // D9: macOS keeps native decorations (titleBarStyle: Overlay in
+            // tauri.conf.json draws the traffic lights over our bar); Windows
+            // and Linux get no native chrome so Titlebar.tsx can draw its own.
+            #[cfg(not(target_os = "macos"))]
+            {
+                use tauri::Manager;
+                if let Some(window) = app.get_webview_window("main") {
+                    window.set_decorations(false)?;
+                }
+            }
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
             server_status,
             server_restart,
