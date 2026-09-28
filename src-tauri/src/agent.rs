@@ -166,6 +166,10 @@ struct Config {
 struct Running {
     id: u64,
     child: Child,
+    /// Para que `cancel()` pueda cerrar el canal sin esperar al lector: si el
+    /// agente dejó nietos vivos, el lector sigue bloqueado en un stdout que
+    /// nadie cierra y la interfaz se queda girando.
+    on_event: Channel<AgentEvent>,
 }
 
 fn running() -> &'static Mutex<Option<Running>> {
@@ -173,9 +177,25 @@ fn running() -> &'static Mutex<Option<Running>> {
     RUNNING.get_or_init(Default::default)
 }
 
+/// Toma el candado tolerando el envenenamiento.
+///
+/// Si un hilo entra en pánico con el candado puesto, `lock().unwrap()` hace
+/// que **toda sesión posterior de chat falle para siempre** — un agente que
+/// muere feo dejaría el Chat muerto hasta reiniciar la app. Acá el dato
+/// protegido es un `Option<Running>`: lo peor que puede pasar es que quede un
+/// hijo sin cosechar, y eso se resuelve reemplazándolo. Seguir es
+/// estrictamente mejor que morir.
+fn running_lock() -> std::sync::MutexGuard<'static, Option<Running>> {
+    running().lock().unwrap_or_else(|e| e.into_inner())
+}
+
 /// Lanza el agente configurado y devuelve enseguida: la salida viaja por
 /// `on_event` desde un hilo, línea a línea, mientras el proceso sigue vivo.
-pub fn send(prompt: String, refs: Vec<String>, on_event: Channel<AgentEvent>) -> Result<(), String> {
+pub fn send(
+    prompt: String,
+    refs: Vec<String>,
+    on_event: Channel<AgentEvent>,
+) -> Result<(), String> {
     let config = config()?;
     let binary = validate(&config.binary)?;
 
@@ -189,6 +209,13 @@ pub fn send(prompt: String, refs: Vec<String>, on_event: Channel<AgentEvent>) ->
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
+    // Grupo propio para que `kill()` pueda llevarse también a los nietos: un
+    // agente que lanza subprocesos los deja vivos si sólo se mata al padre.
+    #[cfg(unix)]
+    {
+        use std::os::unix::process::CommandExt;
+        command.process_group(0);
+    }
     if let Some(dir) = config.workdir.as_deref().filter(|d| !d.is_empty()) {
         if !Path::new(dir).is_dir() {
             return Err(format!("el directorio de trabajo no existe: {dir}"));
@@ -217,7 +244,11 @@ pub fn send(prompt: String, refs: Vec<String>, on_event: Channel<AgentEvent>) ->
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
     // Una sesión por vez: la anterior se corta antes de empezar la nueva.
     // El `let` antes del `if` suelta el candado; matar no se hace con él puesto.
-    let previous = running().lock().unwrap().replace(Running { id, child });
+    let previous = running_lock().replace(Running {
+        id,
+        child,
+        on_event: on_event.clone(),
+    });
     if let Some(previous) = previous {
         kill(previous.child);
     }
@@ -245,7 +276,7 @@ pub fn send(prompt: String, refs: Vec<String>, on_event: Channel<AgentEvent>) ->
         // Sólo reclamamos el hijo si sigue siendo el nuestro: si `cancel()` o
         // un `send()` posterior ya se lo llevó, no es nuestro para esperarlo.
         let mine = {
-            let mut slot = running().lock().unwrap();
+            let mut slot = running_lock();
             match slot.as_ref() {
                 Some(r) if r.id == id => slot.take().map(|r| r.child),
                 _ => None,
@@ -275,16 +306,35 @@ pub fn send(prompt: String, refs: Vec<String>, on_event: Channel<AgentEvent>) ->
 /// Corta el subproceso aunque haya dejado de responder, y nunca falla: no
 /// haber nada corriendo es el estado normal, no un error.
 pub fn cancel() -> Result<(), String> {
-    let current = running().lock().unwrap().take();
+    let current = running_lock().take();
     if let Some(current) = current {
+        let on_event = current.on_event.clone();
         kill(current.child);
+        // El lector emitiría `Done` al ver que el hijo ya no es suyo, pero si
+        // el agente dejó nietos vivos sigue bloqueado en un stdout que nadie
+        // cierra. Cerramos acá: un `Done` de más es inofensivo, una interfaz
+        // colgada no.
+        let _ = on_event.send(AgentEvent::Done);
     }
     Ok(())
 }
 
 /// `kill()` es `SIGKILL` en unix y `TerminateProcess` en Windows: no hay
 /// manejador que el agente pueda ignorar. El `wait()` es para no dejar zombi.
+///
+/// En unix mata primero el **grupo** de procesos: un agente que lanzó
+/// subprocesos deja nietos vivos si sólo se mata al padre, y esos nietos
+/// heredaron el stdout — el mismo problema de huérfanos que la decisión D10
+/// resuelve para el sidecar. `send()` pone al hijo en su propio grupo.
 fn kill(mut child: Child) {
+    #[cfg(unix)]
+    {
+        let _ = Command::new("kill")
+            .args(["-KILL", &format!("-{}", child.id())])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
     let _ = child.kill();
     let _ = child.wait();
 }
@@ -335,7 +385,12 @@ fn config_path() -> Option<PathBuf> {
 /// ponytail: lo mínimo para que cada CLI conocido lea el mensaje por stdin y
 /// conteste una vez. Ajustes escribe `args` y esto deja de usarse.
 fn default_args(binary: &Path) -> Vec<String> {
-    match binary.file_stem().unwrap_or_default().to_string_lossy().as_ref() {
+    match binary
+        .file_stem()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .as_ref()
+    {
         "codex" => vec!["exec".into(), "-".into()],
         "claude" => vec!["-p".into()],
         _ => Vec::new(),
@@ -390,7 +445,10 @@ fn parse(line: &str) -> AgentEvent {
     {
         return AgentEvent::ToolCall {
             name: name.to_string(),
-            args: json.get("input").cloned().unwrap_or(serde_json::Value::Null),
+            args: json
+                .get("input")
+                .cloned()
+                .unwrap_or(serde_json::Value::Null),
         };
     }
     let text = json
@@ -530,7 +588,10 @@ mod tests {
         let dir = scratch("stream");
         // Escribe, duerme, escribe: si la salida llegara toda al final, el
         // primer trozo no podría estar acá antes de que el proceso termine.
-        configure(&dir, "#!/bin/sh\ncat > prompt.txt\necho uno\nsleep 1\necho dos\n");
+        configure(
+            &dir,
+            "#!/bin/sh\ncat > prompt.txt\necho uno\nsleep 1\necho dos\n",
+        );
         let (channel, seen) = recorder();
 
         send("hola".into(), vec!["/tmp/ref.png".into()], channel).unwrap();
@@ -552,14 +613,20 @@ mod tests {
     fn un_agente_que_muere_a_mitad_emite_error() {
         let _guard = test_lock();
         let dir = scratch("muere");
-        configure(&dir, "#!/bin/sh\necho parcial\necho 'se rompió' >&2\nexit 3\n");
+        configure(
+            &dir,
+            "#!/bin/sh\necho parcial\necho 'se rompió' >&2\nexit 3\n",
+        );
         let (channel, seen) = recorder();
 
         send("hola".into(), vec![], channel).unwrap();
 
         assert!(wait_for(&seen, "parcial", 3000));
         assert!(wait_for(&seen, "se rompió", 3000), "no explicó la muerte");
-        assert!(!wait_for(&seen, "Done", 100), "una muerte no es un final feliz");
+        assert!(
+            !wait_for(&seen, "Done", 100),
+            "una muerte no es un final feliz"
+        );
 
         std::env::remove_var("REVERON_AGENT_CONFIG");
         std::fs::remove_dir_all(&dir).ok();
@@ -575,11 +642,18 @@ mod tests {
 
         send("hola".into(), vec![], channel).unwrap();
         assert!(wait_for(&seen, "arranco", 3000));
-        let pid = running().lock().unwrap().as_ref().unwrap().child.id().to_string();
+        let pid = running()
+            .lock()
+            .unwrap()
+            .as_ref()
+            .unwrap()
+            .child
+            .id()
+            .to_string();
 
         cancel().unwrap();
 
-        assert!(running().lock().unwrap().is_none());
+        assert!(running_lock().is_none());
         assert!(
             !Command::new("kill")
                 .args(["-0", pid.as_str()])
