@@ -6,6 +6,9 @@ mod platform;
 mod secrets;
 mod sidecar;
 
+use std::fs;
+use std::path::PathBuf;
+
 use serde::Serialize;
 use tauri::ipc::Channel;
 
@@ -150,8 +153,8 @@ fn reveal_in_files(app: tauri::AppHandle, path: String) -> Result<(), String> {
 }
 
 #[tauri::command]
-fn pick_directory() -> Result<Option<String>, String> {
-    Err(NOT_IMPLEMENTED.into())
+fn pick_directory(prompt: Option<String>) -> Result<Option<String>, String> {
+    platform::pick_directory(prompt.as_deref().unwrap_or("Elegí una carpeta"))
 }
 
 #[tauri::command]
@@ -171,6 +174,62 @@ async fn check_for_updates(app: tauri::AppHandle) -> tauri_plugin_updater::Resul
     }
     Ok(())
 }
+
+/// FR-46: abre `path` en Finder/Explorer/el gestor de archivos de Linux.
+#[tauri::command]
+fn open_path(path: String) -> Result<(), String> {
+    platform::open_path(&path)
+}
+
+/// `~/.reveron/config.json` — el mismo archivo que ya lee y escribe
+/// `src/core/config.mjs` del lado Node (puerto, presupuesto, carpeta de
+/// assets, ...). Éste es el único camino del frontend hacia ese archivo: el
+/// webview no tiene acceso a disco (D8), así que Ajustes pasa siempre por acá.
+fn config_path() -> Result<PathBuf, String> {
+    // Mismo criterio que sidecar.rs al fijar DAVINCI_HOME del sidecar: si
+    // está seteado (tests, o un usuario avanzado) manda; si no, `~/.reveron`.
+    if let Some(home) = std::env::var_os("DAVINCI_HOME") {
+        return Ok(PathBuf::from(home).join("config.json"));
+    }
+    let home = std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .ok_or("no encontré el home del usuario")?;
+    Ok(PathBuf::from(home).join(".reveron").join("config.json"))
+}
+
+#[tauri::command]
+fn config_get() -> Result<serde_json::Value, String> {
+    let path = config_path()?;
+    match fs::read_to_string(&path) {
+        Ok(text) => serde_json::from_str(&text).map_err(|e| e.to_string()),
+        Err(_) => Ok(serde_json::json!({})),
+    }
+}
+
+/// Mezcla superficial: cada clave de `patch` pisa la misma clave del archivo,
+/// el resto queda intacto (igual que `saveConfig` en `core/config.mjs`).
+#[tauri::command]
+fn config_set(patch: serde_json::Value) -> Result<serde_json::Value, String> {
+    let path = config_path()?;
+    let mut current = fs::read_to_string(&path)
+        .ok()
+        .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+    let Some(patch_obj) = patch.as_object() else {
+        return Err("el patch de configuración tiene que ser un objeto".into());
+    };
+    let current_obj = current
+        .as_object_mut()
+        .ok_or("config.json existente no es un objeto")?;
+    for (k, v) in patch_obj {
+        current_obj.insert(k.clone(), v.clone());
+    }
+    if let Some(dir) = path.parent() {
+        fs::create_dir_all(dir).map_err(|e| format!("no pude crear {}: {e}", dir.display()))?;
+    }
+    let body = serde_json::to_string_pretty(&current).map_err(|e| e.to_string())?;
+    fs::write(&path, body).map_err(|e| format!("no pude escribir {}: {e}", path.display()))?;
+    Ok(current)}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -219,6 +278,9 @@ pub fn run() {
             reveal_in_files,
             pick_directory,
             pick_files,
+            open_path,
+            config_get,
+            config_set,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

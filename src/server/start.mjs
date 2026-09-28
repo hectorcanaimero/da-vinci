@@ -1,11 +1,10 @@
 import { existsSync } from 'node:fs';
 import { spawn } from 'node:child_process';
-import { join } from 'node:path';
 import { loadConfig } from '../core/config.mjs';
 import * as router from '../core/router.mjs';
 import { openLibrary } from '../library/db.mjs';
 import { importManifest } from '../library/import.mjs';
-import { resolveOutputDir } from '../utils/manifest.mjs';
+import { resolveOutputDir, resolveManifestPath } from '../utils/manifest.mjs';
 import { events } from './events.mjs';
 import { createJobQueue } from './jobs.mjs';
 import { createServer } from './index.mjs';
@@ -29,10 +28,13 @@ export async function startServer({ port, host, open = true, cwd = process.cwd()
   if (host) config.host = host;
 
   const library = openLibrary();
-  const manifest = join(cwd, 'assets', 'generated', 'manifest.json');
+  const manifest = resolveManifestPath(cwd, config.assetsDir);
   if (existsSync(manifest)) await importManifest(manifest, library).catch(() => {});
 
-  const jobs = createJobQueue({ library, router, events, concurrency: config.concurrency, outDir: resolveOutputDir(cwd) });
+  const jobs = createJobQueue({
+    library, router, events, concurrency: config.concurrency,
+    outDir: resolveOutputDir(cwd, config.assetsDir),
+  });
   const server = createServer({ config, library, router, jobs, events });
   await new Promise((ok, fail) => { server.once('error', fail); server.listen(config.port, config.host, ok); });
 
