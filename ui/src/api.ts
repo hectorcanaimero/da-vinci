@@ -86,3 +86,7 @@ export const getSpend = (q: { from?: string; to?: string; groupBy?: 'day' | 'pro
   request<{ items: SpendRow[]; totalUsd: number }>('GET', `/api/spend${qs(q)}`);
 export const importManifest = (path: string) =>
   request<{ imported: number; skipped: number }>('POST', '/api/import', { path });
+export const getMigration = () =>
+  request<{ detected: boolean; count?: number }>('GET', '/api/migration');
+export const runMigration = () =>
+  request<{ total: number; migrated: number }>('POST', '/api/migration/run');
