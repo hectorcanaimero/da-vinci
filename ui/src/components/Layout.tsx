@@ -1,28 +1,17 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import JobsTray from './JobsTray';
+import { Outlet } from 'react-router-dom';
+import Sidebar from './Sidebar';
 
-const links = [
-  { to: '/', label: 'Library', end: true },
-  { to: '/studio', label: 'Studio' },
-  { to: '/providers', label: 'Providers' },
-  { to: '/spend', label: 'Spend' },
-];
+// Matches Titlebar.tsx's HEIGHT (F1.5.T1) — Layout sits below it in the
+// document, not inside it, so the two can't share the constant directly.
+const TITLEBAR_HEIGHT = 38;
 
 export default function Layout() {
   return (
-    <div className="layout">
-      <nav className="nav" aria-label="Main">
-        <strong className="brand">Da Vinci</strong>
-        {links.map((l) => (
-          <NavLink key={l.to} to={l.to} end={l.end}>
-            {l.label}
-          </NavLink>
-        ))}
-      </nav>
-      <main className="main">
+    <div style={{ display: 'flex', height: `calc(100vh - ${TITLEBAR_HEIGHT}px)`, overflow: 'hidden' }}>
+      <Sidebar />
+      <main style={{ flex: 1, minWidth: 0, overflow: 'auto', background: 'var(--bg-app)', color: 'var(--text-primary)' }}>
         <Outlet />
       </main>
-      <JobsTray />
     </div>
   );
 }
