@@ -66,17 +66,17 @@ fn server_stop() -> Result<(), String> {
 
 #[tauri::command]
 fn secrets_list() -> Result<Vec<KeyStatus>, String> {
-    Err(NOT_IMPLEMENTED.into())
+    secrets::list()
 }
 
 #[tauri::command]
 fn secrets_set(provider: String, value: String) -> Result<KeyStatus, String> {
-    Err(NOT_IMPLEMENTED.into())
+    secrets::set(&provider, &value)
 }
 
 #[tauri::command]
 fn secrets_delete(provider: String) -> Result<(), String> {
-    Err(NOT_IMPLEMENTED.into())
+    secrets::delete(&provider)
 }
 
 #[tauri::command]
