@@ -159,11 +159,27 @@ fn pick_files() -> Result<Option<Vec<String>>, String> {
     Err(NOT_IMPLEMENTED.into())
 }
 
+// D7: busca una versión nueva en el endpoint HTTPS de tauri.conf.json, verifica
+// su firma contra la clave pública embebida y, si es válida, instala y
+// reinicia. Un artefacto con firma alterada hace fallar check()/install() acá
+// y la app sigue en la versión actual.
+async fn check_for_updates(app: tauri::AppHandle) -> tauri_plugin_updater::Result<()> {
+    use tauri_plugin_updater::UpdaterExt;
+    if let Some(update) = app.updater()?.check().await? {
+        update.download_and_install(|_, _| {}, || {}).await?;
+        app.restart();
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         // Arranca el servidor Node y garantiza que muera con la app (D10).
         .plugin(sidecar::plugin())
+        // D7: actualizador firmado con clave propia, verifica la firma de cada
+        // artefacto antes de instalarlo (config en tauri.conf.json).
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .setup(|app| {
             // D9: macOS keeps native decorations (titleBarStyle: Overlay in
             // tauri.conf.json draws the traffic lights over our bar); Windows
@@ -175,6 +191,12 @@ pub fn run() {
                     window.set_decorations(false)?;
                 }
             }
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(error) = check_for_updates(handle).await {
+                    eprintln!("[updater] no pude actualizar: {error}");
+                }
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

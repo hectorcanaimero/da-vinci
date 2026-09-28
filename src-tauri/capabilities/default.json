@@ -3,5 +3,5 @@
   "identifier": "default",
   "description": "Capability por defecto: sólo los permisos core de la ventana principal. Sin shell:allow-execute (decisión D8).",
   "windows": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "updater:default"]
 }

@@ -19,18 +19,30 @@ jobs:
             target: aarch64-apple-darwin
             bundle: dmg
             ext: dmg
+            platform: darwin-aarch64
+            updaterDir: macos
+            updaterExt: app.tar.gz
           - os: macos-14
             target: x86_64-apple-darwin
             bundle: dmg
             ext: dmg
+            platform: darwin-x86_64
+            updaterDir: macos
+            updaterExt: app.tar.gz
           - os: windows-2022
             target: x86_64-pc-windows-msvc
             bundle: msi
             ext: msi
+            platform: windows-x86_64
+            updaterDir: msi
+            updaterExt: msi.zip
           - os: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             bundle: appimage
             ext: AppImage
+            platform: linux-x86_64
+            updaterDir: appimage
+            updaterExt: AppImage.tar.gz
 
     runs-on: ${{ matrix.os }}
     steps:
@@ -65,6 +77,10 @@ jobs:
             libxdo-dev libssl-dev patchelf file
 
       - name: Build installer
+        env:
+          # D7: clave privada del actualizador — secreto de CI, nunca en el repo.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         run: npm run app:build -- --target ${{ matrix.target }} --bundles ${{ matrix.bundle }}
 
       - name: Verify installer size (NFR-12 — falla si supera 150 MB)
@@ -99,3 +115,79 @@ jobs:
           name: reveron-${{ matrix.target }}
           path: src-tauri/target/${{ matrix.target }}/release/bundle/${{ matrix.bundle }}/*.${{ matrix.ext }}
           if-no-files-found: error
+
+      - name: Upload updater artifact + firma (D7)
+        uses: actions/upload-artifact@v4
+        with:
+          name: reveron-updater-${{ matrix.target }}
+          path: |
+            src-tauri/target/${{ matrix.target }}/release/bundle/${{ matrix.updaterDir }}/*.${{ matrix.updaterExt }}
+            src-tauri/target/${{ matrix.target }}/release/bundle/${{ matrix.updaterDir }}/*.${{ matrix.updaterExt }}.sig
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: reveron-*
+          path: artifacts
+
+      - name: Build latest.json (manifiesto del actualizador)
+        env:
+          TAG: ${{ github.ref_name }}
+          REPO: ${{ github.repository }}
+        run: |
+          node --input-type=module -e '
+          import { readFileSync, readdirSync, writeFileSync } from "node:fs";
+          import { join } from "node:path";
+
+          const tag = process.env.TAG;
+          const repo = process.env.REPO;
+
+          // target -> clave de plataforma que espera tauri-plugin-updater (OS-ARCH).
+          const targets = {
+            "aarch64-apple-darwin": "darwin-aarch64",
+            "x86_64-apple-darwin": "darwin-x86_64",
+            "x86_64-pc-windows-msvc": "windows-x86_64",
+            "x86_64-unknown-linux-gnu": "linux-x86_64",
+          };
+
+          const platforms = {};
+          for (const [target, platform] of Object.entries(targets)) {
+            const dir = join("artifacts", `reveron-updater-${target}`);
+            const files = readdirSync(dir);
+            const sigName = files.find((f) => f.endsWith(".sig"));
+            const bundleName = files.find((f) => !f.endsWith(".sig"));
+            if (!sigName || !bundleName) {
+              throw new Error(`Faltan artefactos de actualización en ${dir}`);
+            }
+            platforms[platform] = {
+              signature: readFileSync(join(dir, sigName), "utf8").trim(),
+              url: `https://github.com/${repo}/releases/download/${tag}/${bundleName}`,
+            };
+          }
+
+          writeFileSync(
+            "latest.json",
+            JSON.stringify(
+              { version: tag, pub_date: new Date().toISOString(), platforms },
+              null,
+              2,
+            ),
+          );
+          '
+
+      - name: Publicar release con instaladores, artefactos firmados y manifiesto
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          gh release create "${{ github.ref_name }}" \
+            artifacts/reveron-*/* \
+            latest.json \
+            --title "Reverón ${{ github.ref_name }}" \
+            --generate-notes
