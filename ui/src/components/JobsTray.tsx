@@ -2,7 +2,10 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { loadActiveJobs, useActiveJobCount, useJobs, useServerEvents } from '../sse';
 
-const LABEL = { queued: 'queued', running: 'running', done: 'ready', failed: 'failed' } as const;
+const LABEL = {
+  queued: 'queued', running: 'running', done: 'ready', failed: 'failed',
+  interrupted: 'interrupted', discarded: 'discarded',
+} as const;
 
 export default function JobsTray() {
   const jobs = useJobs();

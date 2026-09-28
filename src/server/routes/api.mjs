@@ -61,6 +61,11 @@ export const routes = [
   { method: 'GET', path: '/api/jobs', handler: (req, res, { send, query, jobs }) =>
     send(200, { items: jobs.list({ status: query.status, limit: num(query.limit) }) }) },
 
+  // Estado de la cola para la tira de estadísticas de Actividad (F6.2.T1): lo único
+  // que no sale ya de /api/jobs?status=... es la concurrencia máxima y si está pausada.
+  { method: 'GET', path: '/api/queue', handler: (req, res, { send, config, jobs }) =>
+    send(200, { concurrency: config.concurrency, paused: jobs.isPaused() }) },
+
   { method: 'GET', path: '/api/jobs/:id', handler: (req, res, { send, params, jobs }) =>
     send(200, found(jobs.get(params.id), 'job')) },
 
