@@ -20,7 +20,11 @@ test('serve arranca, responde /api/health y falla los jobs interrumpidos', async
   try {
     const url = await new Promise((ok, fail) => {
       let out = '';
-      child.stdout.on('data', (d) => { out += d; const m = out.match(/http:\/\/\S+/); if (m) ok(m[0]); });
+      child.stdout.on('data', (d) => {
+        out += d;
+        const i = out.indexOf('\n');
+        if (i !== -1) ok(JSON.parse(out.slice(0, i)).url);
+      });
       child.once('exit', () => fail(new Error(`salió sin URL: ${out}`)));
     });
     const res = await fetch(`${url}/api/health`);
