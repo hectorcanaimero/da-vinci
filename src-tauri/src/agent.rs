@@ -91,7 +91,10 @@ fn extra_dirs() -> Vec<PathBuf> {
         return Vec::new();
     };
     let home = PathBuf::from(home);
-    let mut dirs = vec![home.join(".local").join("bin"), home.join(".npm-global").join("bin")];
+    let mut dirs = vec![
+        home.join(".local").join("bin"),
+        home.join(".npm-global").join("bin"),
+    ];
     #[cfg(target_os = "macos")]
     dirs.extend([
         PathBuf::from("/opt/homebrew/bin"),
