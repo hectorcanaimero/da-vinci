@@ -2,11 +2,16 @@ import { Route, Routes } from 'react-router-dom';
 import ApiKeyGate from './components/ApiKeyGate';
 import Layout from './components/Layout';
 import Titlebar from './components/Titlebar';
-import Library from './pages/Library';
-import Asset from './pages/Asset';
-import Studio from './pages/Studio';
-import Providers from './pages/Providers';
-import Spend from './pages/Spend';
+
+// ponytail: real screens land phase by phase (F3 Estudio, F4 Galería, F5
+// Chat, F6 Actividad...) — for now every destination is just its title.
+function Placeholder({ title }: { title: string }) {
+  return (
+    <div style={{ padding: 32 }}>
+      <h1 style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)', margin: 0 }}>{title}</h1>
+    </div>
+  );
+}
 
 export default function App() {
   return (
@@ -15,12 +20,13 @@ export default function App() {
       <ApiKeyGate>
         <Routes>
           <Route element={<Layout />}>
-            <Route index element={<Library />} />
-            <Route path="asset/:id" element={<Asset />} />
-            <Route path="studio" element={<Studio />} />
-            <Route path="providers" element={<Providers />} />
-            <Route path="spend" element={<Spend />} />
-            <Route path="*" element={<Library />} />
+            <Route index element={<Placeholder title="Chat" />} />
+            <Route path="estudio" element={<Placeholder title="Estudio" />} />
+            <Route path="galeria" element={<Placeholder title="Galería" />} />
+            <Route path="actividad" element={<Placeholder title="Actividad" />} />
+            <Route path="gastos" element={<Placeholder title="Gastos" />} />
+            <Route path="ajustes" element={<Placeholder title="Ajustes" />} />
+            <Route path="*" element={<Placeholder title="Chat" />} />
           </Route>
         </Routes>
       </ApiKeyGate>
