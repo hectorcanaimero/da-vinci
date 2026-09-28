@@ -57,4 +57,9 @@ logs/
 # orch runtime state
 .orchestrator/state/*
 !.orchestrator/state/.gitkeep
+
+# ── Rust / Tauri ────────────────────────────────────────────────────
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/
 tasks.json.bak-*
