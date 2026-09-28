@@ -5,6 +5,8 @@ import Canvas from './Canvas';
 import JobStrip from './JobStrip';
 import ModelPicker from './ModelPicker';
 import Params, { type ParamValues } from './Params';
+import RefDrop from '../../components/RefDrop';
+import type { PickedInput } from '../../components/AssetPicker';
 import type { Estimate, GenerationRequest, ModelInfo } from '../../types';
 
 // Estudio sólo expone estos 5 tipos (spec F3.1.T1) — el resto del catálogo
@@ -33,7 +35,13 @@ const KIND_ICON: Record<StudioKind, ReactNode> = {
 const isStudioKind = (v: string | null): v is StudioKind => !!v && (KINDS as string[]).includes(v);
 const usd = (n: number) => `$${n.toFixed(3)}`;
 
-function buildRequest(kind: StudioKind, model: string, content: string, voice: string, params: ParamValues): GenerationRequest {
+const toRequestInput = (r: PickedInput): { id: string } | { url: string } | { path: string } =>
+  r.id ? { id: r.id } : r.url ? { url: r.url } : { path: r.path! };
+
+function buildRequest(
+  kind: StudioKind, model: string, content: string, voice: string, params: ParamValues,
+  refs: PickedInput[], acceptsInputs: ModelInfo['acceptsInputs'] | undefined,
+): GenerationRequest {
   const req: GenerationRequest = { kind, model: model || undefined };
   const trimmed = content.trim();
   if (kind === 'audio') {
@@ -44,6 +52,11 @@ function buildRequest(kind: StudioKind, model: string, content: string, voice: s
   }
   const cleanParams = Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== ''));
   if (Object.keys(cleanParams).length) req.params = cleanParams;
+  // FR-19: sólo se adjuntan referencias si el modelo elegido las soporta —
+  // acceptsInputs 0 significa que el proveedor las ignoraría o rechazaría.
+  if (acceptsInputs && refs.length) {
+    req.inputs = (acceptsInputs === 1 ? refs.slice(0, 1) : refs).map(toRequestInput);
+  }
   return JSON.parse(JSON.stringify(req)); // drop undefined keys so estimate == what POST sends
 }
 
@@ -62,6 +75,7 @@ export default function Studio() {
   const [content, setContent] = useState(init.content);
   const [voice, setVoice] = useState('');
   const [params, setParams] = useState<ParamValues>({});
+  const [refs, setRefs] = useState<PickedInput[]>([]);
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [totalAvailable, setTotalAvailable] = useState<number | null>(null);
   const [est, setEst] = useState<Estimate | null>(null);
@@ -71,8 +85,12 @@ export default function Studio() {
   const [busy, setBusy] = useState(false);
   const [lastJobId, setLastJobId] = useState<string | null>(null);
 
-  const request = useMemo(() => buildRequest(kind, model, content, voice, params), [kind, model, content, voice, params]);
-  const provider = models.find((m) => m.id === model)?.provider;
+  const modelInfo = models.find((m) => m.id === model);
+  const provider = modelInfo?.provider;
+  const request = useMemo(
+    () => buildRequest(kind, model, content, voice, params, refs, modelInfo?.acceptsInputs),
+    [kind, model, content, voice, params, refs, modelInfo?.acceptsInputs],
+  );
 
   useEffect(() => {
     listModels().then((r) => setTotalAvailable(r.items.filter((m) => m.available).length)).catch(() => {});
@@ -114,6 +132,7 @@ export default function Studio() {
       setLastJobId(job.id);
       setContent('');
       setVoice('');
+      setRefs([]);
     } catch (e) {
       if (e instanceof ApiError && e.code === 'cost_confirm_required') setPending(e.details as Estimate);
       else if (e instanceof ApiError && e.code === 'budget_exceeded') {
@@ -161,6 +180,7 @@ export default function Studio() {
 
           <ModelPicker models={models} value={model} onChange={setModel} />
           <Params kind={kind} provider={provider} values={params} onChange={setParams} />
+          <RefDrop value={refs} onChange={setRefs} />
 
           <section style={estimateBox}>
             {est ? (

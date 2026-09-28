@@ -184,6 +184,8 @@ pub fn run() {
         // Sólo se otorga reveal-item-in-dir (ver capabilities/default.json);
         // el acotado a la carpeta de assets vive en platform::reveal_in_files.
         .plugin(tauri_plugin_opener::init())
+        // Diálogo nativo de archivos (F3.3.T1, capability dialog:default).
+        .plugin(tauri_plugin_dialog::init())
         .setup(|app| {
             // D9: macOS keeps native decorations (titleBarStyle: Overlay in
             // tauri.conf.json draws the traffic lights over our bar); Windows

@@ -20,6 +20,8 @@ tauri-plugin-updater = "2"
 # archivos de Linux. Su ACL no soporta acotar por ruta (ver platform.rs), por
 # eso sólo se otorga el permiso reveal-item-in-dir, nunca opener:default.
 tauri-plugin-opener = "2"
+# F3.3.T1: diálogo nativo de archivos para adjuntar referencias (FR-19).
+tauri-plugin-dialog = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # keyring 3, no 4: la 4.x se reescribió sobre keyring-core y cambió el modelo de
