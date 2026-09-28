@@ -1,5 +1,6 @@
 import { Route, Routes } from 'react-router-dom';
 import ApiKeyGate from './components/ApiKeyGate';
+import CommandPalette from './components/CommandPalette';
 import Layout from './components/Layout';
 import Titlebar from './components/Titlebar';
 
@@ -17,6 +18,7 @@ export default function App() {
   return (
     <>
       <Titlebar />
+      <CommandPalette />
       <ApiKeyGate>
         <Routes>
           <Route element={<Layout />}>
