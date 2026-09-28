@@ -124,4 +124,32 @@ export const routes = [
     const result = await migrateFromDavinci({ destHome: resolveHome() });
     send(200, result);
   } },
+
+  { method: 'POST', path: '/api/jobs/:id/resume', handler: (req, res, { send, params, jobs }) => {
+    try {
+      const job = jobs.resume(params.id);
+      send(200, job);
+    } catch (e) {
+      throw new DavinciError(e?.code ?? 'internal_error', e?.message ?? String(e));
+    }
+  } },
+
+  { method: 'POST', path: '/api/jobs/:id/discard', handler: (req, res, { send, params, jobs }) => {
+    try {
+      const job = jobs.discard(params.id);
+      send(200, job);
+    } catch (e) {
+      throw new DavinciError(e?.code ?? 'internal_error', e?.message ?? String(e));
+    }
+  } },
+
+  { method: 'POST', path: '/api/queue/pause', handler: (req, res, { send, jobs }) => {
+    jobs.pauseQueue();
+    send(200, { paused: true });
+  } },
+
+  { method: 'POST', path: '/api/queue/resume', handler: (req, res, { send, jobs }) => {
+    jobs.resumeQueue();
+    send(200, { paused: false });
+  } },
 ];
