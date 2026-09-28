@@ -36,11 +36,20 @@ pub struct AgentInfo {
 #[derive(Serialize)]
 #[serde(tag = "event", content = "data")]
 pub enum AgentEvent {
-    Chunk { text: String },
-    ToolCall { name: String, args: serde_json::Value },
-    Cost { usd: f64 },
+    Chunk {
+        text: String,
+    },
+    ToolCall {
+        name: String,
+        args: serde_json::Value,
+    },
+    Cost {
+        usd: f64,
+    },
     Done,
-    Error { message: String },
+    Error {
+        message: String,
+    },
 }
 
 #[tauri::command]

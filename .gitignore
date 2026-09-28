@@ -23,6 +23,9 @@ assets/generated/
 !docs/examples/**/*.svg
 !docs/examples/**/*.gif
 !docs/**/*.png
+# El icono de la app es codigo, no un asset generado: generate_context! no
+# compila sin el.
+!src-tauri/icons/**
 !docs/**/*.svg
 
 # ── Node ────────────────────────────────────────────────────────────
@@ -67,3 +70,7 @@ src-tauri/target/
 src-tauri/gen/
 src-tauri/binaries/
 tasks.json.bak-*
+
+# Temporal de scripts/fetch-node.mjs — un tarball de ~54 MB se colo al repo
+# en el PR #30 por no estar listado aca.
+.node-fetch-tmp/
