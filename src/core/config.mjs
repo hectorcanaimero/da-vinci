@@ -15,6 +15,9 @@ export const DEFAULTS = {
   // exige confirmación explícita; entre `auto` y `warn` sólo avisa.
   thresholds: { auto: 0.10, warn: 1.00 },
   fallback: true,
+  // FR-46: dónde aterrizan los archivos generados. null = default histórico,
+  // `<cwd>/assets/generated` (ver `resolveOutputDir` en utils/manifest.mjs).
+  assetsDir: null,
 };
 
 export const resolveHome = () => process.env.DAVINCI_HOME || join(homedir(), '.davinci');

@@ -9,6 +9,7 @@ import Titlebar from './components/Titlebar';
 import Asset from './pages/Asset';
 import Library from './pages/Library';
 import Onboarding from './pages/Onboarding';
+import Settings from './pages/Settings';
 import Studio from './pages/Studio';
 
 const ONBOARDED_KEY = 'reveron.onboarded';
@@ -58,7 +59,7 @@ export default function App() {
               <Route path="actividad" element={<Activity />} />
               <Route path="asset/:id" element={<Asset />} />
               <Route path="gastos" element={<Placeholder title="Gastos" />} />
-              <Route path="ajustes" element={<Placeholder title="Ajustes" />} />
+              <Route path="ajustes" element={<Settings />} />
               <Route path="*" element={<Placeholder title="Chat" />} />
             </Route>
           </Routes>
