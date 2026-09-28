@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { DavinciError } from '../../core/errors.mjs';
 import { MODELS, COST_TABLE } from '../../core/catalog.mjs';
 import { importManifest } from '../../library/import.mjs';
+import { detectDavinci, migrateFromDavinci } from '../../library/migrate.mjs';
+import { resolveHome } from '../../core/config.mjs';
 
 const { version } = JSON.parse(readFileSync(new URL('../../../package.json', import.meta.url), 'utf8'));
 
@@ -93,5 +95,19 @@ export const routes = [
   { method: 'POST', path: '/api/import', handler: async (req, res, { send, body, library }) => {
     if (!body?.path) throw new DavinciError('invalid_request', 'falta path');
     send(200, await importManifest(body.path, library));
+  } },
+
+  { method: 'GET', path: '/api/migration', handler: async (req, res, { send }) => {
+    const detected = await detectDavinci();
+    if (detected) {
+      send(200, { detected: true, count: detected.count });
+    } else {
+      send(200, { detected: false });
+    }
+  } },
+
+  { method: 'POST', path: '/api/migration/run', handler: async (req, res, { send }) => {
+    const result = await migrateFromDavinci({ destHome: resolveHome() });
+    send(200, result);
   } },
 ];
