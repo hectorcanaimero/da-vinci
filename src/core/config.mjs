@@ -7,7 +7,10 @@ export const DEFAULTS = {
   host: '127.0.0.1',
   apiKey: null,
   concurrency: 3,
+  // FR-32: tope de gasto del día, en USD. null = sin tope.
   dailyBudgetUsd: null,
+  // Umbrales de costo de una generación, en USD (FR-17): por encima de `warn`
+  // exige confirmación explícita; entre `auto` y `warn` sólo avisa.
   thresholds: { auto: 0.10, warn: 1.00 },
   fallback: true,
 };
