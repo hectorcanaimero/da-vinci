@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ApiError, createGeneration, estimate, listModels } from '../../api';
+import Canvas from './Canvas';
+import JobStrip from './JobStrip';
 import ModelPicker from './ModelPicker';
 import Params, { type ParamValues } from './Params';
 import type { Estimate, GenerationRequest, ModelInfo } from '../../types';
@@ -177,10 +179,8 @@ export default function Studio() {
         </form>
 
         <div style={canvasCol}>
-          <p style={canvasNote}>
-            {lastJobId ? <>Job <code style={jobCode}>{lastJobId}</code> en cola.</> : 'Generá algo para verlo acá.'}
-            {' '}El lienzo de resultado y la cola llegan en F3.1.T2.
-          </p>
+          <Canvas jobId={lastJobId} />
+          <JobStrip />
         </div>
       </div>
 
@@ -208,11 +208,7 @@ const formCol: CSSProperties = {
   display: 'flex', flexDirection: 'column', gap: 18,
   background: 'var(--bg-surface)', borderRight: '1px solid var(--border)',
 };
-const canvasCol: CSSProperties = {
-  flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
-};
-const canvasNote: CSSProperties = { color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', maxWidth: 360 };
-const jobCode: CSSProperties = { fontFamily: 'var(--font-mono)', color: 'var(--text-secondary)' };
+const canvasCol: CSSProperties = { flex: 1, minWidth: 0, minHeight: 0, display: 'flex', flexDirection: 'column' };
 
 const sectionLabel: CSSProperties = {
   display: 'block', fontSize: 11, letterSpacing: '0.06em', textTransform: 'uppercase',
