@@ -40,6 +40,17 @@ jobs:
       - name: Build UI
         run: npm run build:ui
 
+      # `binaries/` esta en .gitignore: el binario de Node se baja, no se
+      # versiona. Sin el, el build script de tauri aborta con
+      # "resource path binaries/node-<triple> doesn't exist".
+      - name: Cache Node sidecar binary
+        uses: actions/cache@v4
+        with:
+          path: src-tauri/binaries
+          key: node-sidecar-x86_64-unknown-linux-gnu-${{ hashFiles('scripts/fetch-node.mjs') }}
+      - name: Fetch Node sidecar binary
+        run: node scripts/fetch-node.mjs --target x86_64-unknown-linux-gnu
+
       - name: Tauri system deps
         run: |
           sudo apt-get update
