@@ -126,7 +126,7 @@ export default function VirtualGrid<T>({
     const isVisible = visible.has(i);
     const content = isVisible ? renderRow(rowItems, i, columns) : null;
     if (as === 'tbody') {
-      if (content) return cloneElement(content as ReactElement, { key: i, ref: getRef(i) });
+      if (content) return cloneElement(content as ReactElement<Record<string, unknown>>, { key: i, ref: getRef(i) });
       return (
         <tr key={i} ref={getRef(i) as never}>
           <td colSpan={placeholderColSpan} style={{ height, padding: 0, border: 'none' }} />

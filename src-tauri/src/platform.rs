@@ -57,6 +57,8 @@ pub fn reveal_in_files(app: &AppHandle, path: &str) -> Result<(), String> {
     app.opener()
         .reveal_item_in_dir(target)
         .map_err(|e| e.to_string())
+}
+
 /// FR-46: selector de directorio nativo. Cada sistema ya trae el suyo por
 /// línea de comandos, así que esto no suma un plugin nuevo — sólo lo invoca.
 /// `Ok(None)` es cancelar el diálogo, no un error.

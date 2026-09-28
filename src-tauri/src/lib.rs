@@ -229,7 +229,8 @@ fn config_set(patch: serde_json::Value) -> Result<serde_json::Value, String> {
     }
     let body = serde_json::to_string_pretty(&current).map_err(|e| e.to_string())?;
     fs::write(&path, body).map_err(|e| format!("no pude escribir {}: {e}", path.display()))?;
-    Ok(current)}
+    Ok(current)
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
