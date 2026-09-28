@@ -38,7 +38,8 @@ export async function startServer({ port, host, open = true, cwd = process.cwd()
   await new Promise((ok, fail) => { server.once('error', fail); server.listen(config.port, config.host, ok); });
 
   const url = `http://${config.host.includes(':') ? `[${config.host}]` : config.host}:${server.address().port}`;
-  console.log(`Da Vinci escuchando en ${url}`);
+  console.error(`Da Vinci escuchando en ${url}`);
+  console.log(JSON.stringify({ event: 'ready', port: server.address().port, url }));
   if (open) openBrowser(url);
 
   let closing = false;
@@ -50,5 +51,10 @@ export async function startServer({ port, host, open = true, cwd = process.cwd()
     library.close();
   };
   for (const sig of ['SIGINT', 'SIGTERM']) process.once(sig, () => close().then(() => process.exit(0)));
+  if (process.env.REVERON_PARENT === '1') {
+    // D10, segunda defensa: sin padre viendo el pid, el cierre de stdin es la única señal de huérfano.
+    process.stdin.on('end', () => close().then(() => process.exit(0)));
+    process.stdin.resume();
+  }
   return { server, url, close };
 }
