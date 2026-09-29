@@ -7,6 +7,7 @@ import CommandPalette from './components/CommandPalette';
 import Layout from './components/Layout';
 import Titlebar from './components/Titlebar';
 import Asset from './pages/Asset';
+import Chat from './pages/Chat';
 import Library from './pages/Library';
 import Onboarding from './pages/Onboarding';
 import Settings from './pages/Settings';
@@ -31,16 +32,6 @@ function useNeedsOnboarding() {
   return needs;
 }
 
-// ponytail: las pantallas reales aterrizan fase por fase — Chat (F5),
-// Actividad (F6.2) y Ajustes (F6.4) todavía muestran sólo su título.
-function Placeholder({ title }: { title: string }) {
-  return (
-    <div style={{ padding: 32 }}>
-      <h1 style={{ fontFamily: 'var(--font-display)', color: 'var(--text-primary)', margin: 0 }}>{title}</h1>
-    </div>
-  );
-}
-
 export default function App() {
   const needsOnboarding = useNeedsOnboarding();
 
@@ -54,14 +45,14 @@ export default function App() {
         ) : needsOnboarding === false ? (
           <Routes>
             <Route element={<Layout />}>
-              <Route index element={<Placeholder title="Chat" />} />
+              <Route index element={<Chat />} />
               <Route path="estudio" element={<Studio />} />
               <Route path="galeria" element={<Library />} />
               <Route path="actividad" element={<Activity />} />
               <Route path="asset/:id" element={<Asset />} />
               <Route path="gastos" element={<Spend />} />
               <Route path="ajustes" element={<Settings />} />
-              <Route path="*" element={<Placeholder title="Chat" />} />
+              <Route path="*" element={<Chat />} />
             </Route>
           </Routes>
         ) : null}
