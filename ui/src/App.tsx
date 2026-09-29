@@ -11,6 +11,7 @@ import Chat from './pages/Chat';
 import Library from './pages/Library';
 import Onboarding from './pages/Onboarding';
 import Settings from './pages/Settings';
+import { initAppearance } from './pages/Settings/Appearance';
 import Spend from './pages/Spend';
 import Studio from './pages/Studio';
 
@@ -34,6 +35,11 @@ function useNeedsOnboarding() {
 
 export default function App() {
   const needsOnboarding = useNeedsOnboarding();
+
+  // FR-47: aplica el tema/tipografía/movimiento guardados apenas arranca la
+  // app y deja el listener de `prefers-color-scheme` puesto todo el tiempo,
+  // no sólo mientras Ajustes > Apariencia está montada.
+  useEffect(() => initAppearance(), []);
 
   return (
     <>

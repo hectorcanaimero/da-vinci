@@ -43,7 +43,12 @@ export function createServer({ config, library, router, jobs, events = sharedEve
   if (!isLocalHost(config.host) && !config.apiKey) {
     throw new Error(`host "${config.host}" no es local: configura apiKey en config.json para exponer el servidor (o usa host 127.0.0.1)`);
   }
-  const match = createRouter([...apiRoutes, ...filesRoutes, ...openaiRoutes, ...providersRoutes,
+  // FR-43 / F6.4.T2: Ajustes > Servidor puede apagar el endpoint compatible
+  // con OpenAI; `openaiCompatEnabled` en config.json no está en DEFAULTS
+  // (igual que otras claves de Ajustes) — ausente u otro valor que no sea
+  // `false` significa habilitado, que es el comportamiento histórico.
+  const compat = config.openaiCompatEnabled !== false ? openaiRoutes : [];
+  const match = createRouter([...apiRoutes, ...filesRoutes, ...compat, ...providersRoutes,
     { method: 'GET', path: '/api/events', handler: sseHandler(events) }]);
 
   return http.createServer(async (req, res) => {

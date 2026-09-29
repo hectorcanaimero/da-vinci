@@ -3,6 +3,10 @@ import { useSearchParams } from 'react-router-dom';
 import Providers from './Providers';
 import Agents from './Agents';
 import Storage from './Storage';
+import Server from './Server';
+import Budget from './Budget';
+import Appearance from './Appearance';
+import Advanced from './Advanced';
 
 const icon = (children: ReactNode) => (
   <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7}
@@ -10,19 +14,6 @@ const icon = (children: ReactNode) => (
     {children}
   </svg>
 );
-
-// ponytail: Server/Budget/Appearance/Advanced land in F6.4.T2 — that task
-// isn't scoped to touch this file, so its sections get a plain placeholder
-// here rather than an import that doesn't exist yet. Swap each `render` for
-// a real `<Component />` as F6.4.T2 lands.
-function ComingSoon({ label }: { label: string }) {
-  return (
-    <div style={comingSoon}>
-      <div style={comingSoonTitle}>{label}</div>
-      <p style={comingSoonBody}>Esta sección se completa en F6.4.T2.</p>
-    </div>
-  );
-}
 
 type Section = { key: string; label: string; icon: ReactNode; render: () => ReactNode };
 
@@ -40,19 +31,19 @@ const SECTIONS: Section[] = [
     icon: icon(<><rect x="3" y="7" width="18" height="13" rx="2" /><path d="M3 11h18" /></>),
   },
   {
-    key: 'servidor', label: 'Servidor & API', render: () => <ComingSoon label="Servidor & API" />,
+    key: 'servidor', label: 'Servidor & API', render: () => <Server />,
     icon: icon(<><rect x="4" y="4" width="16" height="6" rx="1.5" /><rect x="4" y="14" width="16" height="6" rx="1.5" /><path d="M8 7h.01M8 17h.01" /></>),
   },
   {
-    key: 'presupuesto', label: 'Presupuesto', render: () => <ComingSoon label="Presupuesto" />,
+    key: 'presupuesto', label: 'Presupuesto', render: () => <Budget />,
     icon: icon(<><circle cx="12" cy="12" r="8.5" /><path d="M12 7.5v9M9.5 9.8c0-1.3 1.1-2.3 2.5-2.3s2.5 1 2.5 2.1c0 2.8-5 1.5-5 4.2 0 1.2 1.1 2.2 2.5 2.2s2.5-1 2.5-2.3" /></>),
   },
   {
-    key: 'apariencia', label: 'Apariencia', render: () => <ComingSoon label="Apariencia" />,
+    key: 'apariencia', label: 'Apariencia', render: () => <Appearance />,
     icon: icon(<><circle cx="12" cy="12" r="8.5" /><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="currentColor" stroke="none" /></>),
   },
   {
-    key: 'avanzado', label: 'Avanzado', render: () => <ComingSoon label="Avanzado" />,
+    key: 'avanzado', label: 'Avanzado', render: () => <Advanced />,
     icon: icon(<><circle cx="12" cy="12" r="3.2" /><path d="M12 3v2.4M12 18.6V21M4.2 12H6.6M17.4 12H19.8M6 6l1.7 1.7M16.3 16.3 18 18M18 6l-1.7 1.7M7.7 16.3 6 18" /></>),
   },
 ];
@@ -117,10 +108,3 @@ const navItem = (isActive: boolean): CSSProperties => ({
 });
 
 const content: CSSProperties = { flex: 1, minWidth: 0, overflowY: 'auto', padding: '24px 28px 40px' };
-
-const comingSoon: CSSProperties = {
-  border: '1px dashed var(--border)', borderRadius: 10, padding: '28px 24px',
-  color: 'var(--text-muted)', maxWidth: 480,
-};
-const comingSoonTitle: CSSProperties = { fontSize: 15, fontWeight: 600, color: 'var(--text-secondary)', marginBottom: 6 };
-const comingSoonBody: CSSProperties = { fontSize: 13, margin: 0 };
