@@ -9,8 +9,8 @@
   --accent: #7c9cff;
   --danger: #ff6b6b;
 
-  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', Menlo, monospace;
+  --font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
   --fs-sm: 0.875rem;
   --fs-md: 1rem;
   --fs-lg: 1.5rem;
@@ -59,17 +59,3 @@ h1 { font-size: var(--fs-lg); margin: 0 0 var(--sp-3); }
   .main { margin-left: 0; padding-bottom: calc(var(--nav-h) + var(--sp-4)); }
 }
 
-#font-check {
-  background: var(--bg-app);
-  color: var(--text-primary);
-  margin-left: var(--nav-w);
-  padding: var(--sp-4);
-  display: flex;
-  flex-direction: column;
-  gap: var(--sp-2);
-}
-#font-check .display { font-family: var(--font-display); font-weight: 600; font-size: 2rem; }
-#font-check .ui { font-family: var(--font-ui); font-weight: 400; }
-#font-check .ui strong { font-weight: 600; }
-#font-check .mono { font-family: var(--font-mono); font-weight: 400; }
-#font-check .mono strong { font-weight: 600; }
