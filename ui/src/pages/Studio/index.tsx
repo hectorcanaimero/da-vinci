@@ -75,7 +75,14 @@ export default function Studio() {
   const [content, setContent] = useState(init.content);
   const [voice, setVoice] = useState('');
   const [params, setParams] = useState<ParamValues>({});
-  const [refs, setRefs] = useState<PickedInput[]>([]);
+  // FR-22: "Usar como referencia" en el detalle de un asset navega acá con
+  // ?ref=<id> (+ mime/nombre para el thumbnail) — se adjunta sin que el
+  // usuario copie ninguna ruta, vía el mismo RefDrop del FR-19.
+  const [refs, setRefs] = useState<PickedInput[]>(() => {
+    const ref = search.get('ref');
+    if (!ref) return [];
+    return [{ id: ref, mime: search.get('refMime') ?? undefined, name: search.get('refName') ?? undefined }];
+  });
   const [models, setModels] = useState<ModelInfo[]>([]);
   const [totalAvailable, setTotalAvailable] = useState<number | null>(null);
   const [est, setEst] = useState<Estimate | null>(null);
