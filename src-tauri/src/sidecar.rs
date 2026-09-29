@@ -133,9 +133,10 @@ pub fn spawn<R: Runtime>(app: &AppHandle<R>) -> Result<Sidecar, String> {
         .map_err(|e| format!("no encuentro el directorio del usuario: {e}"))?
         .join(".reveron");
 
+    let (bind_host, bind_port) = configured_bind();
     let mut child = Command::new(&node)
         .arg(&cli)
-        .args(["--port", "0", "--host", "127.0.0.1"])
+        .args(["--port", &bind_port, "--host", &bind_host])
         .env("DAVINCI_HOME", &home)
         .env("REVERON_PARENT", "1")
         // D4: las llaves del llavero van como env del hijo; `secrets.mjs` ya
@@ -220,8 +221,9 @@ fn current_url<R: Runtime>(app: &AppHandle<R>) -> Option<String> {
 }
 
 /// Mata el proceso viejo (si hay) y lanza uno nuevo, que ya arranca con la
-/// llave nueva porque `secrets::env_pairs` la lee del llavero recién escrito.
-fn restart<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+/// llave nueva porque `secrets::env_pairs` la lee del llavero recién escrito
+/// — y con el host/puerto que Ajustes haya guardado en config.json (F6.4.T2).
+pub fn restart<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     let state = app
         .try_state::<SidecarState>()
         .ok_or("el plugin del sidecar no está montado")?;
@@ -239,6 +241,52 @@ fn restart<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
             Err(error)
         }
     }
+}
+
+/// Apaga el sidecar sin relanzarlo (F6.4.T2, botón "Detener" de Ajustes) — a
+/// diferencia de `restart`, no hay `spawn()` de vuelta.
+pub fn stop<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+    let state = app
+        .try_state::<SidecarState>()
+        .ok_or("el plugin del sidecar no está montado")?;
+    if let Some(old) = state.process.lock().unwrap().take() {
+        old.kill();
+    }
+    *state.last_error.lock().unwrap() = None;
+    Ok(())
+}
+
+/// Host/puerto que Ajustes > Servidor (F6.4.T2) haya guardado en config.json
+/// vía `config_set`. Sin archivo o sin esas claves, cae al comportamiento
+/// histórico de F1.3.T2: sólo loopback, puerto que el propio Node elige.
+/// `dynamicPort` en `false` es lo único que hace que el puerto guardado
+/// pise al aleatorio.
+fn configured_bind() -> (String, String) {
+    let cfg = crate::config_path()
+        .ok()
+        .and_then(|p| std::fs::read_to_string(p).ok())
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok());
+    let host = cfg
+        .as_ref()
+        .and_then(|c| c.get("host"))
+        .and_then(|v| v.as_str())
+        .unwrap_or("127.0.0.1")
+        .to_string();
+    let dynamic_port = cfg
+        .as_ref()
+        .and_then(|c| c.get("dynamicPort"))
+        .and_then(|v| v.as_bool())
+        .unwrap_or(true);
+    let port = if dynamic_port {
+        "0".to_string()
+    } else {
+        cfg.as_ref()
+            .and_then(|c| c.get("port"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(20130)
+            .to_string()
+    };
+    (host, port)
 }
 
 fn parse_handshake(line: &str) -> Option<u16> {

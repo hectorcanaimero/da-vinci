@@ -61,14 +61,11 @@ pub enum AgentEvent {
     },
 }
 
-#[tauri::command]
-fn server_status(app: tauri::AppHandle) -> Result<ServerStatus, String> {
-    use tauri::Manager;
-    let state = app
-        .try_state::<sidecar::SidecarState>()
-        .ok_or("el plugin del sidecar no está montado")?;
+/// Común a `server_status` y `server_restart`: lo que ve el resto de la app,
+/// leído del mismo `SidecarState` que mantiene vivo al proceso (D10).
+fn status_from_state(state: &sidecar::SidecarState) -> ServerStatus {
     let process = state.process.lock().unwrap();
-    Ok(match process.as_ref() {
+    match process.as_ref() {
         Some(s) => ServerStatus {
             alive: true,
             port: Some(s.port),
@@ -85,17 +82,33 @@ fn server_status(app: tauri::AppHandle) -> Result<ServerStatus, String> {
             url: None,
             error: state.last_error.lock().unwrap().clone(),
         },
-    })
+    }
 }
 
 #[tauri::command]
-fn server_restart() -> Result<ServerStatus, String> {
-    Err(NOT_IMPLEMENTED.into())
+fn server_status(app: tauri::AppHandle) -> Result<ServerStatus, String> {
+    use tauri::Manager;
+    let state = app
+        .try_state::<sidecar::SidecarState>()
+        .ok_or("el plugin del sidecar no está montado")?;
+    Ok(status_from_state(&state))
+}
+
+// F6.4.T2: Ajustes > Servidor necesita reiniciar/detener de verdad (host,
+// puerto y llave nuevos sólo entran en vigencia con el sidecar relanzado).
+#[tauri::command]
+fn server_restart(app: tauri::AppHandle) -> Result<ServerStatus, String> {
+    use tauri::Manager;
+    sidecar::restart(&app)?;
+    let state = app
+        .try_state::<sidecar::SidecarState>()
+        .ok_or("el plugin del sidecar no está montado")?;
+    Ok(status_from_state(&state))
 }
 
 #[tauri::command]
-fn server_stop() -> Result<(), String> {
-    Err(NOT_IMPLEMENTED.into())
+fn server_stop(app: tauri::AppHandle) -> Result<(), String> {
+    sidecar::stop(&app)
 }
 
 #[tauri::command]
