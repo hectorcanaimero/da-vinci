@@ -3,6 +3,7 @@ import { listModels } from '../../api';
 import RefDrop from '../../components/RefDrop';
 import type { PickedInput } from '../../components/AssetPicker';
 import type { ModelInfo } from '../../types';
+import SessionCostGate from './SessionCost';
 
 // Mismos 5 intents que Estudio (spec F3.1.T1) — acá sólo son una pista para
 // el agente, no disparan la generación directamente: el agente es quien
@@ -86,10 +87,16 @@ export default function Composer({ onSend, busy, disabled }: {
           {models.map((m) => <option key={m.id} value={m.id}>{m.model}</option>)}
         </select>
 
-        <button type="button" style={sendBtn} disabled={!canSend} onClick={submit}>
-          {busy ? 'Generando…' : <>Generar {SEND_ICON}</>}
-        </button>
+        {!intent && (
+          <button type="button" style={sendBtn} disabled={!canSend} onClick={submit}>
+            {busy ? 'Generando…' : <>Generar {SEND_ICON}</>}
+          </button>
+        )}
       </div>
+
+      {/* FR-36: con intención elegida hay un GenerationRequest concreto que estimar —
+          reusa la barrera de F3.2.T2 en vez del botón liso de arriba. */}
+      {intent && <SessionCostGate kind={intent} model={model} prompt={text} refs={refs} disabled={!canSend} onSend={submit} />}
     </div>
   );
 }

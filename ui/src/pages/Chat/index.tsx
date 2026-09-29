@@ -4,6 +4,8 @@ import { useServerEvents } from '../../sse';
 import type { Generation } from '../../types';
 import Thread, { type ChatMessage } from './Thread';
 import Composer, { type ComposerSend } from './Composer';
+import NoAgent from './NoAgent';
+import { SessionCostBadge, useSessionCost } from './SessionCost';
 
 // Lo que reporta `agent_detect()` / guarda `config_set({agent})` (F5.1.T1,
 // Settings/Agents.tsx) — el Chat sólo lee y, si el usuario toca un pill,
@@ -49,10 +51,13 @@ export default function Chat() {
   const [detected, setDetected] = useState<AgentInfo[]>([]);
   const activeAgentId = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { totalUsd, addCost } = useSessionCost();
+
+  const detectAgents = () => invoke<AgentInfo[]>('agent_detect').then(setDetected).catch(() => setDetected([]));
 
   useEffect(() => {
     invoke<{ agent?: AgentConfig }>('config_get').then((r) => setCfg(r.agent ?? {})).catch(() => setCfg({}));
-    invoke<AgentInfo[]>('agent_detect').then(setDetected).catch(() => setDetected([]));
+    void detectAgents();
   }, []);
 
   useEffect(() => {
@@ -113,9 +118,9 @@ export default function Chat() {
       } else if (evt.event === 'Error') {
         updateAgent(agentId, (m) => ({ ...m, streaming: false, error: evt.data.message }));
         setBusy(false);
+      } else if (evt.event === 'Cost') {
+        addCost(evt.data.usd);
       }
-      // 'Cost' — el gasto acumulado de la sesión lo pinta F5.2.T2 (FR-36) en
-      // el encabezado; este componente no lo necesita.
     };
 
     invoke('agent_send', { prompt: buildPrompt(text, intent, modelLabel), refs: refs.map(refToString), onEvent: channel })
@@ -152,17 +157,23 @@ export default function Chat() {
               ))}
             </div>
           ) : (
-            <span style={noAgent}>Sin agente detectado — configurá uno en Ajustes</span>
+            <span style={noAgent}>Sin agente detectado</span>
           )}
+          <SessionCostBadge totalUsd={totalUsd} />
           <button type="button" style={newBtn} onClick={newSession}>+ Nueva sesión</button>
         </div>
       </header>
 
-      <div ref={scrollRef} style={scroll}>
-        <Thread messages={messages} />
-      </div>
-
-      <Composer onSend={send} busy={busy} disabled={detected.length === 0} />
+      {detected.length === 0 ? (
+        <NoAgent onRetry={detectAgents} />
+      ) : (
+        <>
+          <div ref={scrollRef} style={scroll}>
+            <Thread messages={messages} />
+          </div>
+          <Composer onSend={send} busy={busy} />
+        </>
+      )}
     </div>
   );
 }
