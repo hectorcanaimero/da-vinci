@@ -67,7 +67,7 @@ export default function Actions({ gen }: Props) {
   const studioUrl = (kind: string, input: string = gen.id) => {
     const params = new URLSearchParams({ kind, input });
     if (gen.prompt) params.set('prompt', gen.prompt);
-    return `/studio?${params.toString()}`;
+    return `/estudio?${params.toString()}`;
   };
 
   return (

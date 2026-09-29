@@ -62,7 +62,7 @@ function buildRequest(
 
 export default function Studio() {
   const [search] = useSearchParams();
-  // Preload de /studio?kind&model&prompt (usado por "Derivar" en Asset) — leído una sola vez.
+  // Preload de /estudio?kind&model&prompt (usado por "Derivar" en Asset) — leído una sola vez.
   const [init] = useState(() => ({
     kind: isStudioKind(search.get('kind')) ? (search.get('kind') as StudioKind) : 'image' as StudioKind,
     model: search.get('model') ?? '',
